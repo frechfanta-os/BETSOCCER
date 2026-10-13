@@ -46,6 +46,7 @@ L'ensemble des livrables de l'audit approfondi des 12 sources sportives est cons
 - [**legal-and-licensing-review.md**](docs/phase-1.5/legal-and-licensing-review.md) : Analyse juridique (droit d'auteur, droit *sui generis*, jurisprudence et RGPD).
 - [**recommended-data-architecture.md**](docs/phase-1.5/recommended-data-architecture.md) : Architecture de collecte, déduplication et stabilité du schéma SQLite V1.
 - [**audit-summary.md**](docs/phase-1.5/audit-summary.md) : Synthèse décisionnelle exécutive répondant aux 11 questions clés.
+- [**validation-report.md**](docs/phase-1.5/validation-report.md) : Audit de validation post-livraison Crawl4AI et base SQLite (Verdict PARTIAL).
 
 ### Collecteur Autonome Crawl4AI
 - [**crawl4ai-collector-report.md**](docs/crawl4ai-collector-report.md) : Rapport d'ingestion autonome Crawl4AI, validation de déduplication et mesures de fraîcheur.
