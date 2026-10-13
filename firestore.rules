@@ -1,0 +1,29 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Règle par défaut : Refus strict de tout accès non explicitement autorisé
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Données privées de l'utilisateur : Accès réservé strictement au propriétaire authentifié
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // Sous-collection des paramètres et préférences personnelles
+      match /settings/{settingId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // Sous-collection des signets et analyses sauvegardées
+      match /saved_analyses/{analysisId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // Les données sportives publiques (sports, compétitions, matchs) sont gérées localement dans SQLite.
+    // Aucune collection publique de données sportives n'est ouverte en écriture sur Firestore.
+  }
+}

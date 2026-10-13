@@ -1,0 +1,107 @@
+name: BETSOCCER - Build & Release Android APK
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build_release:
+    name: Build & Verify Android Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Extract Pubspec Version & Build Number
+        id: version_extract
+        run: |
+          VERSION_LINE=$(grep '^version:' pubspec.yaml | head -n 1 | awk '{print $2}')
+          VERSION_NAME=$(echo "$VERSION_LINE" | cut -d '+' -f 1)
+          VERSION_CODE=$(echo "$VERSION_LINE" | cut -d '+' -f 2)
+          echo "PUBSPEC_VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
+          echo "PUBSPEC_VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
+          echo "Extracted Version: $VERSION_NAME+$VERSION_CODE"
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build Android Release APK
+        run: |
+          flutter build apk --release \
+            --build-name="${{ env.PUBSPEC_VERSION_NAME }}" \
+            --build-number="${{ env.PUBSPEC_VERSION_CODE }}"
+
+      - name: Validate APK Internal Metadata & Package ID
+        run: |
+          APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
+          AAPT_BIN=$(find $ANDROID_HOME/build-tools -name aapt | sort -V | tail -n 1)
+          echo "Using aapt binary: $AAPT_BIN"
+          
+          PACKAGE_NAME=$($AAPT_BIN dump badging "$APK_PATH" | grep "package: name=" | sed -E "s/.*package: name='([^']+)'.*/\1/")
+          echo "Detected APK Package Name: $PACKAGE_NAME"
+          
+          if [ "$PACKAGE_NAME" != "com.ghdinteractivestudio.betsoccer" ]; then
+            echo "ERROR: Package name mismatch! Expected 'com.ghdinteractivestudio.betsoccer', got '$PACKAGE_NAME'"
+            exit 1
+          fi
+          echo "Package name verification PASSED."
+
+      - name: Prepare Release Artifacts & SHA-256 Checksums
+        run: |
+          mkdir -p release-artifacts
+          SRC_APK="build/app/outputs/flutter-apk/app-release.apk"
+          NAMED_APK="release-artifacts/BETSOCCER-v${{ env.PUBSPEC_VERSION_NAME }}.apk"
+          STANDARD_APK="release-artifacts/app-release.apk"
+          
+          cp "$SRC_APK" "$STANDARD_APK"
+          cp "$SRC_APK" "$NAMED_APK"
+          
+          cd release-artifacts
+          sha256sum "app-release.apk" "BETSOCCER-v${{ env.PUBSPEC_VERSION_NAME }}.apk" > app-release.apk.sha256
+          PRIMARY_SHA256=$(sha256sum "app-release.apk" | awk '{print $1}')
+          echo "PRIMARY_SHA256=$PRIMARY_SHA256" >> $GITHUB_ENV
+          cd ..
+
+      - name: Generate Release Notes
+        run: |
+          cat << 'EOF' > RELEASE_NOTES.md
+          ### BETSOCCER v${{ env.PUBSPEC_VERSION_NAME }} (${{ env.PUBSPEC_VERSION_CODE }})
+
+          Mise à jour de l'application BETSOCCER — Multisport Analytics AI.
+          Package ID: `com.ghdinteractivestudio.betsoccer`
+
+          #### Intégrité des Artefacts
+          - **SHA-256**: `${{ env.PRIMARY_SHA256 }}`
+          EOF
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          body_path: RELEASE_NOTES.md
+          files: |
+            release-artifacts/app-release.apk
+            release-artifacts/BETSOCCER-v${{ env.PUBSPEC_VERSION_NAME }}.apk
+            release-artifacts/app-release.apk.sha256

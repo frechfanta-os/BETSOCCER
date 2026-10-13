@@ -9,35 +9,58 @@
 - **Organisation :** `com.ghdinteractivestudio`
 - **Application ID :** `com.ghdinteractivestudio.betsoccer`
 - **Dépôt officiel :** [https://github.com/frechfanta-os/BETSOCCER](https://github.com/frechfanta-os/BETSOCCER)
-- **Framework :** Flutter / Dart (Android-first)
-- **Persistance :** SQLite local (Drift) — Approche *Offline-First*
-- **Intelligence Artificielle :** OpenRouter (Fournisseurs multiples, modèles gratuits avec fallback)
+- **Framework :** Flutter 3.47 / Dart 3.13 (Android-first)
+- **Persistance :** SQLite local (`sqflite`) — Approche *Offline-First* souveraine
+- **Cloud & Sync :** Firebase (`betsoccer-60834`) — Préférences utilisateur & Thème (0 €)
 - **Données sportives :** OpenFootball (CC0 1.0 Universal), TheSportsDB, Football-Data.org
+- **Politique MelBet :** `DISABLED_BY_POLICY` (Scraping interdit)
 
 ---
 
-## 2. Documentation de la Phase 0 (Audit & Faisabilité)
+## 2. Documentation du Projet
 
-La Phase 0 a produit un audit exhaustif et validé de faisabilité logicielle et d'architecture. L'ensemble des livrables est consultable dans le répertoire [`docs/phase-0/`](docs/phase-0/) :
-
+### Phase 0 — Audit & Faisabilité
+L'ensemble des livrables de Phase 0 est consultable dans [`docs/phase-0/`](docs/phase-0/) :
 - [**audit-report.md**](docs/phase-0/audit-report.md) : Audit du dépôt distant GitHub et conformité.
-- [**environment-report.md**](docs/phase-0/environment-report.md) : Audit de l'environnement matériel, PRoot, Flutter, Dart et vérification des accès.
-- [**replica-skills-report.md**](docs/phase-0/replica-skills-report.md) : Inventaire des compétences Replica et méthode de développement Clean Room.
-- [**data-sources-report.md**](docs/phase-0/data-sources-report.md) : Étude comparative des sources de données et statuts de qualification.
-- [**backend-comparison.md**](docs/phase-0/backend-comparison.md) : Comparaison des architectures backends et justification du choix Offline-First hybride.
-- [**architecture-proposal.md**](docs/phase-0/architecture-proposal.md) : Architecture logicielle cible Clean Architecture / Feature-First.
-- [**security-review.md**](docs/phase-0/security-review.md) : Revue de sécurité, cycle de vie des secrets et standard OTA.
-- [**implementation-roadmap.md**](docs/phase-0/implementation-roadmap.md) : Feuille de route détaillée pour la Phase 1 et les phases suivantes.
+- [**environment-report.md**](docs/phase-0/environment-report.md) : Audit de l'environnement matériel, PRoot, Flutter, Dart.
+- [**replica-skills-report.md**](docs/phase-0/replica-skills-report.md) : Inventaire des compétences Replica et méthode Clean Room.
+- [**data-sources-report.md**](docs/phase-0/data-sources-report.md) : Qualification des sources de données.
+- [**backend-comparison.md**](docs/phase-0/backend-comparison.md) : Justification de l'approche hybride Offline-First.
+- [**architecture-proposal.md**](docs/phase-0/architecture-proposal.md) : Architecture cible Clean Architecture / Feature-First.
+- [**security-review.md**](docs/phase-0/security-review.md) : Revue de sécurité, secrets et OTA.
+- [**implementation-roadmap.md**](docs/phase-0/implementation-roadmap.md) : Feuille de route d'implémentation.
 - [**decisions.md**](docs/phase-0/decisions.md) : Registre des décisions d'architecture (ADR-001 à ADR-007).
-- [**melbet-data-access-audit.md**](docs/phase-0/melbet-data-access-audit.md) : Audit prioritaire du web search, scraping et faisabilité des données MelBet.
+- [**melbet-data-access-audit.md**](docs/phase-0/melbet-data-access-audit.md) : Audit prioritaire de non-faisabilité MelBet.
+
+### Phase 1 — Fondation & Connecteurs Sportifs
+Les rapports de Phase 1 et de l'intégration Firebase sont consultables dans [`docs/phase-1/`](docs/phase-1/) et [`docs/`](docs/) :
+- [**implementation-report.md**](docs/phase-1/implementation-report.md) : Implémentation du socle Flutter, SQLite V1 et contrôleur réactif.
+- [**data-connectors-report.md**](docs/phase-1/data-connectors-report.md) : Spécification de `SportsDataSource` et des connecteurs.
+- [**testing-report.md**](docs/phase-1/testing-report.md) : Rapport complet des tests (25 tests passés avec 100% de réussite).
+- [**firebase-integration-report.md**](docs/firebase-integration-report.md) : Rapport d'intégration Firebase (projet `betsoccer-60834`).
 
 ---
 
-## 3. Statut du Projet
+## 3. Statut d'Avancement des Phases
 
 - [x] **Phase 0 :** Audit complet, faisabilité et validation architecturale (Terminée).
-- [ ] **Phase 1 :** Socle technique Flutter, SQLite local & pipeline CI GitHub Actions.
-- [ ] **Phase 2 :** Moteur statistique déterministe (Poisson, Dixon-Coles, Elo) & Design Tokens.
-- [ ] **Phase 3 :** Tranche verticale & Écrans métiers (D1 Live, D2 Fixtures, D3 Historique, D4 Stats, D5 IA).
+- [x] **Phase 1 :** Socle technique Flutter Android-First, base SQLite V1, connecteurs de données, intégration Firebase & CI GitHub Actions (Terminée).
+- [ ] **Phase 2 :** Moteur statistique déterministe (Loi de Poisson, Dixon-Coles, Elo) & Design Tokens.
+- [ ] **Phase 3 :** Tranche verticale & Écrans métiers complets (Live, Fixtures, Historique, Filtres).
 - [ ] **Phase 4 :** Orchestration IA OpenRouter, Backtesting temporel & QA.
 - [ ] **Phase 5 :** Automatisation CI/CD, Compilation APK Release & Intégrité OTA.
+
+---
+
+## 4. Commandes de Développement & Validation
+
+```bash
+# Formater le code Dart
+dart format .
+
+# Analyse statique (0 erreur requise)
+flutter analyze
+
+# Exécuter les tests automatisés
+flutter test
+```
