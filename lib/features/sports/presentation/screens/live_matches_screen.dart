@@ -153,6 +153,7 @@ class LiveMatchesScreen extends StatelessWidget {
                       isFavorite: controller.isFavoriteMatch(match.id),
                       onFavoriteToggle: () =>
                           controller.toggleFavoriteMatch(match.id),
+                      allMatches: controller.allMatches,
                     );
                   }, childCount: liveMatches.length),
                 ),

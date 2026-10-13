@@ -50,7 +50,10 @@ class HomeScreen extends StatelessWidget {
 
               // 3. Match à la une (Hero Banner Card)
               SliverToBoxAdapter(
-                child: FeaturedMatchCard(match: controller.featuredMatch),
+                child: FeaturedMatchCard(
+                  match: controller.featuredMatch,
+                  allMatches: controller.allMatches,
+                ),
               ),
 
               // 4. En-tête de section "Today's Matches"
@@ -150,6 +153,7 @@ class HomeScreen extends StatelessWidget {
                       isFavorite: controller.isFavoriteMatch(match.id),
                       onFavoriteToggle: () =>
                           controller.toggleFavoriteMatch(match.id),
+                      allMatches: controller.allMatches,
                     );
                   }, childCount: todayMatches.length),
                 ),

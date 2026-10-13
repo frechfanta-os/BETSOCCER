@@ -7,11 +7,16 @@ import '../../domain/repositories/sports_repository.dart';
 import '../../../../core/errors/app_exception.dart';
 import '../../../../core/errors/failure.dart';
 import '../../../../core/services/firebase_sync_adapter.dart';
+import '../../../../core/stats/statistical_engine.dart';
+import '../../../../core/stats/models/prediction_result.dart';
+import '../../../../core/stats/models/statistical_metrics.dart';
+import '../../../../core/stats/evaluator/backtest_evaluator.dart';
 
 /// Contrôleur d'état principal pour l'expérience multisport BETSOCCER
 class SportsController extends ChangeNotifier {
   final SportsRepository repository;
   final FirebaseSyncAdapter syncAdapter;
+  final StatisticalEngine statisticalEngine;
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -75,7 +80,11 @@ class SportsController extends ChangeNotifier {
   CompetitionEntity? _selectedCompetition;
   CompetitionEntity? get selectedCompetition => _selectedCompetition;
 
-  SportsController({required this.repository, required this.syncAdapter});
+  SportsController({
+    required this.repository,
+    required this.syncAdapter,
+    this.statisticalEngine = const StatisticalEngine(),
+  });
 
   void _setLoading(bool value) {
     _isLoading = value;
@@ -337,7 +346,7 @@ class SportsController extends ChangeNotifier {
     }
 
     return {
-      'matchesAnalysed': totalAnalysed > 0 ? totalAnalysed : 380,
+      'matchesAnalysed': totalAnalysed,
       'avgGoals': double.parse(avgGoals.toStringAsFixed(1)),
       'homeWinPct': homeWinPct.round(),
       'drawPct': drawPct.round(),
@@ -345,6 +354,66 @@ class SportsController extends ChangeNotifier {
       'homeGoalsTrend': homeGoalsTrend,
       'awayGoalsTrend': awayGoalsTrend,
     };
+  }
+
+  /// Estime les probabilités d'un match via le Moteur Statistique
+  MatchPredictionResult predictMatch(
+    MatchEntity match, {
+    DateTime? cutoffDate,
+  }) {
+    return statisticalEngine.predictMatch(
+      match: match,
+      allMatches: _allMatches,
+      cutoffDate: cutoffDate,
+    );
+  }
+
+  /// Forme récente d'une équipe calculée sur les matchs réels
+  TeamRecentForm getTeamRecentForm(
+    String teamId,
+    String teamName, {
+    int limit = 5,
+    DateTime? cutoffDate,
+  }) {
+    return statisticalEngine.getTeamRecentForm(
+      teamId: teamId,
+      teamName: teamName,
+      allMatches: _allMatches,
+      limit: limit,
+      cutoffDate: cutoffDate,
+    );
+  }
+
+  /// Statistiques comparatives Domicile vs Extérieur
+  VenueSplitStats getVenueSplitStats(String teamId, {DateTime? cutoffDate}) {
+    return statisticalEngine.getVenueSplitStats(
+      teamId: teamId,
+      allMatches: _allMatches,
+      cutoffDate: cutoffDate,
+    );
+  }
+
+  /// Historique des confrontations directes
+  HeadToHeadSummary getHeadToHead(
+    String teamAId,
+    String teamAName,
+    String teamBId,
+    String teamBName, {
+    DateTime? cutoffDate,
+  }) {
+    return statisticalEngine.getHeadToHeadSummary(
+      teamAId: teamAId,
+      teamAName: teamAName,
+      teamBId: teamBId,
+      teamBName: teamBName,
+      allMatches: _allMatches,
+      cutoffDate: cutoffDate,
+    );
+  }
+
+  /// Métriques d'évaluation scientifique walk-forward
+  Map<String, BacktestEvaluationMetrics> runScientificBacktest() {
+    return statisticalEngine.runBacktest(_allMatches);
   }
 
   Future<void> refreshLiveMatches() async {

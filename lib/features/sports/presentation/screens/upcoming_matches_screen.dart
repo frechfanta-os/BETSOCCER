@@ -250,6 +250,7 @@ class UpcomingMatchesScreen extends StatelessWidget {
                       isFavorite: controller.isFavoriteMatch(match.id),
                       onFavoriteToggle: () =>
                           controller.toggleFavoriteMatch(match.id),
+                      allMatches: controller.allMatches,
                     );
                   }, childCount: fixtures.length),
                 ),

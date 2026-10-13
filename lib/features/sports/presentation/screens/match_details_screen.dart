@@ -3,11 +3,19 @@ import 'package:flutter/material.dart';
 import '../../domain/entities/match.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/date_utils.dart';
+import '../../../../core/stats/statistical_engine.dart';
+import '../../../../core/stats/models/prediction_result.dart';
+import '../../../../core/stats/models/statistical_metrics.dart';
 
 class MatchDetailsScreen extends StatefulWidget {
   final MatchEntity match;
+  final List<MatchEntity> allMatches;
 
-  const MatchDetailsScreen({super.key, required this.match});
+  const MatchDetailsScreen({
+    super.key,
+    required this.match,
+    this.allMatches = const [],
+  });
 
   @override
   State<MatchDetailsScreen> createState() => _MatchDetailsScreenState();
@@ -365,124 +373,386 @@ class _MatchDetailsScreenState extends State<MatchDetailsScreen>
         ),
         const SizedBox(height: 12),
 
-        // 2. Forme récente des équipes (Team Form - Last 5)
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: borderColor),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Forme récente (5 derniers matchs)',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: primaryColor,
-                ),
+        // 2. Forme récente des équipes (Team Form)
+        Builder(
+          builder: (context) {
+            const engine = StatisticalEngine();
+            final homeForm = engine.getTeamRecentForm(
+              teamId: match.homeTeamId,
+              teamName: match.homeTeamName,
+              allMatches: widget.allMatches,
+              cutoffDate: match.utcKickoff,
+            );
+            final awayForm = engine.getTeamRecentForm(
+              teamId: match.awayTeamId,
+              teamName: match.awayTeamName,
+              allMatches: widget.allMatches,
+              cutoffDate: match.utcKickoff,
+            );
+
+            final homeOutcomes = homeForm.outcomes.map((o) {
+              return switch (o) {
+                MatchOutcome.win => 'W',
+                MatchOutcome.draw => 'D',
+                MatchOutcome.loss => 'L',
+              };
+            }).toList();
+
+            final awayOutcomes = awayForm.outcomes.map((o) {
+              return switch (o) {
+                MatchOutcome.win => 'W',
+                MatchOutcome.draw => 'D',
+                MatchOutcome.loss => 'L',
+              };
+            }).toList();
+
+            return Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: borderColor),
               ),
-              const SizedBox(height: 12),
-              _buildTeamFormRow(match.homeTeamName, [
-                'W',
-                'L',
-                'W',
-                'W',
-                'W',
-              ], primaryColor),
-              const SizedBox(height: 10),
-              _buildTeamFormRow(match.awayTeamName, [
-                'L',
-                'W',
-                'L',
-                'W',
-                'D',
-              ], primaryColor),
-            ],
-          ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Forme récente (Données réelles)',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: primaryColor,
+                        ),
+                      ),
+                      Text(
+                        'Derniers matchs',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: secondaryColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _buildTeamFormRow(
+                    match.homeTeamName,
+                    homeOutcomes,
+                    primaryColor,
+                    secondaryColor: secondaryColor,
+                  ),
+                  const SizedBox(height: 10),
+                  _buildTeamFormRow(
+                    match.awayTeamName,
+                    awayOutcomes,
+                    primaryColor,
+                    secondaryColor: secondaryColor,
+                  ),
+                ],
+              ),
+            );
+          },
         ),
         const SizedBox(height: 12),
 
-        // 3. Analyse IA & Modèle Statistique (Probabilités)
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: borderColor),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        // 3. Analyse & Modèle Statistique (Probabilités Normalisées)
+        Builder(
+          builder: (context) {
+            const engine = StatisticalEngine();
+            final prediction = engine.predictMatch(
+              match: match,
+              allMatches: widget.allMatches,
+              cutoffDate: match.utcKickoff,
+            );
+
+            // Badge de statut du modèle
+            final Color statusColor;
+            final String statusLabel;
+            switch (prediction.status) {
+              case EstimationStatus.confirmed:
+                statusColor = AppColors.neonLime;
+                statusLabel = 'Modèle Confirmé (N ≥ 5)';
+                break;
+              case EstimationStatus.shrinkageEstimation:
+                statusColor = const Color(0xFFF59E0B); // Amber
+                statusLabel = 'Régularisé (Shrinkage Bayésien)';
+                break;
+              case EstimationStatus.insufficientData:
+                statusColor = secondaryColor;
+                statusLabel = 'Échantillon Insuffisant';
+                break;
+              case EstimationStatus.unsupportedSportModel:
+                statusColor = AppColors.liveRed;
+                statusLabel = 'Sport Incompatible';
+                break;
+            }
+
+            final isFootball =
+                match.sportId.toLowerCase().contains('football') ||
+                match.sportId.toLowerCase().contains('soccer');
+
+            return Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: borderColor),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF6366F1).withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF6366F1)
+                                  .withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.auto_awesome_rounded,
+                              color: Color(0xFF818CF8),
+                              size: 16,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Modèle Statistique',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              color: primaryColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: statusColor.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Text(
+                          statusLabel,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: statusColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Ligne des probabilités normalisées
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildProbabilityBox(
+                          'Victoire Dom.',
+                          '${(prediction.homeWinProb * 100).toStringAsFixed(1)}%',
+                          AppColors.neonLime,
+                          isDark,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildProbabilityBox(
+                          'Match Nul',
+                          prediction.drawProb > 0
+                              ? '${(prediction.drawProb * 100).toStringAsFixed(1)}%'
+                              : 'N/A',
+                          secondaryColor,
+                          isDark,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildProbabilityBox(
+                          'Victoire Ext.',
+                          '${(prediction.awayWinProb * 100).toStringAsFixed(1)}%',
+                          AppColors.statBlue,
+                          isDark,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Ligne des buts attendus si football
+                  if (isFootball && prediction.expectedHomeScore != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? AppColors.surfaceElevatedDark
+                            : AppColors.surfaceElevatedLight,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'xG Estimés : Dom ${prediction.expectedHomeScore}  •  Ext ${prediction.expectedAwayScore}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: primaryColor,
+                            ),
+                          ),
+                          if (prediction.mostLikelyScore != null)
+                            Text(
+                              'Score probable : ${prediction.mostLikelyScore}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.neonLime,
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.auto_awesome_rounded,
-                      color: Color(0xFF818CF8),
-                      size: 16,
+
+                  const SizedBox(height: 10),
+
+                  // Métadonnées méthodologiques et scientifiques
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0xFF0F172A)
+                          : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '• Méthode : ${prediction.method}',
+                          style: TextStyle(fontSize: 10, color: secondaryColor),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '• Données : ${prediction.totalMatchesAnalyzed} matchs historiques (${prediction.homeTeamMatchesCount} dom / ${prediction.awayTeamMatchesCount} ext) analysés',
+                          style: TextStyle(fontSize: 10, color: secondaryColor),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '• Indice de confiance : ${(prediction.confidenceScore * 100).toStringAsFixed(0)}% (Entropie normalisée: ${prediction.entropy})',
+                          style: TextStyle(fontSize: 10, color: secondaryColor),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 8),
+
+                  const SizedBox(height: 10),
                   Text(
-                    'Analyse IA (Modèle Mathématique)',
+                    prediction.disclaimer,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontStyle: FontStyle.italic,
+                      color: secondaryColor,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+
+        // 4. Historique des Confrontations Directes (H2H)
+        Builder(
+          builder: (context) {
+            const engine = StatisticalEngine();
+            final h2h = engine.getHeadToHeadSummary(
+              teamAId: match.homeTeamId,
+              teamAName: match.homeTeamName,
+              teamBId: match.awayTeamId,
+              teamBName: match.awayTeamName,
+              allMatches: widget.allMatches,
+              cutoffDate: match.utcKickoff,
+            );
+
+            return Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: borderColor),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Confrontations directes (H2H)',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
                       color: primaryColor,
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  if (h2h.totalMatches == 0)
+                    Text(
+                      'Aucune confrontation directe antérieure enregistrée dans la base entre ces deux équipes.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                        color: secondaryColor,
+                      ),
+                    )
+                  else
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        Text(
+                          '${match.homeTeamName} : ${h2h.teamAWins} V',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: primaryColor,
+                          ),
+                        ),
+                        Text(
+                          'Nuls : ${h2h.draws}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: secondaryColor,
+                          ),
+                        ),
+                        Text(
+                          '${match.awayTeamName} : ${h2h.teamBWins} V',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: primaryColor,
+                          ),
+                        ),
+                      ],
+                    ),
                 ],
               ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildProbabilityBox(
-                      'Victoire Domicile',
-                      '62%',
-                      AppColors.neonLime,
-                      isDark,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _buildProbabilityBox(
-                      'Victoire Extérieur',
-                      '38%',
-                      AppColors.statBlue,
-                      isDark,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _buildProbabilityBox(
-                      'Buts Estimés (xG)',
-                      '2.8',
-                      Colors.amber,
-                      isDark,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Ces probabilités sont calculées par modélisation statistique sur les données réelles. Elles ne constituent aucune promesse de résultat.',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontStyle: FontStyle.italic,
-                  color: secondaryColor,
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ],
     );
@@ -739,8 +1009,9 @@ class _MatchDetailsScreenState extends State<MatchDetailsScreen>
   Widget _buildTeamFormRow(
     String team,
     List<String> outcomes,
-    Color primaryColor,
-  ) {
+    Color primaryColor, {
+    Color? secondaryColor,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -755,29 +1026,46 @@ class _MatchDetailsScreenState extends State<MatchDetailsScreen>
             overflow: TextOverflow.ellipsis,
           ),
         ),
-        Row(
-          children: outcomes.map((o) {
-            final color = o == 'W'
-                ? AppColors.winGreen
-                : (o == 'L' ? AppColors.lossRed : AppColors.drawYellow);
-            return Container(
-              margin: const EdgeInsets.only(left: 4),
-              width: 22,
-              height: 22,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-              child: Center(
-                child: Text(
-                  o,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
+        if (outcomes.isEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: (secondaryColor ?? Colors.grey).withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              'Cold Start (0 match)',
+              style: TextStyle(
+                fontSize: 10,
+                color: secondaryColor ?? Colors.grey,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          )
+        else
+          Row(
+            children: outcomes.map((o) {
+              final color = o == 'W'
+                  ? AppColors.winGreen
+                  : (o == 'L' ? AppColors.lossRed : AppColors.drawYellow);
+              return Container(
+                margin: const EdgeInsets.only(left: 4),
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                child: Center(
+                  child: Text(
+                    o,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
-              ),
-            );
-          }).toList(),
-        ),
+              );
+            }).toList(),
+          ),
       ],
     );
   }

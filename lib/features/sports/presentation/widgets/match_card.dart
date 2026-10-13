@@ -16,6 +16,7 @@ class MatchCard extends StatelessWidget {
   final bool isFavorite;
   final VoidCallback? onFavoriteToggle;
   final VoidCallback? onTap;
+  final List<MatchEntity> allMatches;
 
   const MatchCard({
     super.key,
@@ -24,6 +25,7 @@ class MatchCard extends StatelessWidget {
     this.isFavorite = false,
     this.onFavoriteToggle,
     this.onTap,
+    this.allMatches = const [],
   });
 
   @override
@@ -63,7 +65,10 @@ class MatchCard extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => MatchDetailsScreen(match: match),
+                    builder: (_) => MatchDetailsScreen(
+                      match: match,
+                      allMatches: allMatches,
+                    ),
                   ),
                 );
               },

@@ -6,8 +6,9 @@ import '../screens/match_details_screen.dart';
 
 class FeaturedMatchCard extends StatelessWidget {
   final MatchEntity? match;
+  final List<MatchEntity> allMatches;
 
-  const FeaturedMatchCard({super.key, this.match});
+  const FeaturedMatchCard({super.key, this.match, this.allMatches = const []});
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +29,8 @@ class FeaturedMatchCard extends StatelessWidget {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => MatchDetailsScreen(match: match!),
+                builder: (_) =>
+                    MatchDetailsScreen(match: match!, allMatches: allMatches),
               ),
             );
           }
