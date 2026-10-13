@@ -283,4 +283,27 @@ class SportsRepository {
 
     return matches.length;
   }
+
+  /// Récupère l'ensemble des matchs stockés localement
+  Future<List<MatchEntity>> getAllMatches({
+    String? sportId,
+    String? competitionId,
+    String? status,
+  }) async {
+    return sportsDao.getMatches(
+      sportId: sportId,
+      competitionId: competitionId,
+      status: status,
+    );
+  }
+
+  /// Récupère la liste des sources de données
+  Future<List<Map<String, dynamic>>> getDataSources() async {
+    return sportsDao.getDataSources();
+  }
+
+  /// Récupère l'historique des synchronisations
+  Future<List<Map<String, dynamic>>> getAllSyncStates() async {
+    return sportsDao.getAllSyncStates();
+  }
 }

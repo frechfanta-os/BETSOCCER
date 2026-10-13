@@ -197,6 +197,7 @@ class SportsDao {
   }
 
   Future<List<MatchEntity>> getMatches({
+    String? sportId,
     String? competitionId,
     String? status,
     String? seasonId,
@@ -207,6 +208,10 @@ class SportsDao {
     final whereClauses = <String>[];
     final whereArgs = <dynamic>[];
 
+    if (sportId != null) {
+      whereClauses.add('m.sport_id = ?');
+      whereArgs.add(sportId);
+    }
     if (competitionId != null) {
       whereClauses.add('m.competition_id = ?');
       whereArgs.add(competitionId);
@@ -377,5 +382,9 @@ class SportsDao {
       limit: 1,
     );
     return rows.isNotEmpty ? rows.first : null;
+  }
+
+  Future<List<Map<String, dynamic>>> getAllSyncStates() async {
+    return _db.query('sync_state', orderBy: 'last_synced_at DESC');
   }
 }

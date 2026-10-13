@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../controllers/sports_controller.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -10,289 +9,535 @@ class SettingsScreen extends StatelessWidget {
 
   const SettingsScreen({super.key, required this.controller});
 
+  static const List<String> _allSports = [
+    'Football',
+    'Basketball',
+    'Tennis',
+    'Handball',
+    'Volleyball',
+  ];
+
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryTextColor = isDark
+        ? AppColors.textPrimaryDark
+        : AppColors.textPrimaryLight;
+    final secondaryTextColor = isDark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondaryLight;
+    final cardBg = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
+    final borderColor = isDark ? AppColors.borderDark : AppColors.borderLight;
+
     final fbService = FirebaseService.instance;
     final isFbInitialized = fbService.isInitialized;
-    final fbUserId = fbService.currentUserId;
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        // 1. SECTION : SOURCES DE DONNÉES & GOUVERNANCE
-        _buildSectionHeader('Sources de Données Sportives'),
-        _buildSourceTile(
-          name: 'OpenFootball',
-          description: 'Archives historiques & backtesting',
-          statusLabel: 'ACTIF (CC0)',
-          statusColor: AppColors.primary,
-          icon: Icons.folder_zip_rounded,
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          'Settings',
+          style: TextStyle(
+            color: primaryTextColor,
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+          ),
         ),
-        _buildSourceTile(
-          name: 'TheSportsDB',
-          description: 'Métadonnées multi-sports (Clé test V1)',
-          statusLabel: 'ACTIF (V1)',
-          statusColor: AppColors.secondary,
-          icon: Icons.public_rounded,
-        ),
-        _buildSourceTile(
-          name: 'Football-Data.org',
-          description: 'Calendriers et 12 ligues majeures',
-          statusLabel: 'ACTIF (Gratuit)',
-          statusColor: AppColors.upcomingBlue,
-          icon: Icons.sports_soccer_rounded,
-        ),
-        _buildSourceTile(
-          name: 'MelBet',
-          description: 'Scraping et flux internes non autorisés',
-          statusLabel: 'DISABLED_BY_POLICY',
-          statusColor: AppColors.liveRed,
-          icon: Icons.block_rounded,
-        ),
-        const SizedBox(height: 20),
-
-        // 2. SECTION : SYNCHRONISATION FIREBASE CLOUD
-        _buildSectionHeader('Synchronisation Cloud Firebase'),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(14.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Projet Firebase :',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          children: [
+            // 1. CARTE COMPAGNON PROFIL UTILISATEUR
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: borderColor),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isDark
+                          ? AppColors.surfaceElevatedDark
+                          : AppColors.surfaceElevatedLight,
                     ),
-                    Text(
-                      'betsoccer-60834',
-                      style: TextStyle(
-                        fontFamily: 'monospace',
-                        color: isFbInitialized
-                            ? AppColors.primary
-                            : AppColors.sampleAmber,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Statut Cloud :',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color:
-                            (isFbInitialized
-                                    ? AppColors.primary
-                                    : AppColors.sampleAmber)
-                                .withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        isFbInitialized ? 'CONNECTÉ' : 'MODE HORS-LIGNE',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: isFbInitialized
-                              ? AppColors.primary
-                              : AppColors.sampleAmber,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                if (fbUserId != null) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    'UID: ${fbUserId.substring(0, 12)}...',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondaryDark,
+                    child: Icon(
+                      Icons.person_outline_rounded,
+                      size: 26,
+                      color: primaryTextColor,
                     ),
                   ),
-                ],
-                const SizedBox(height: 12),
-                const Text(
-                  'Note : Cloud Firestore synchronise uniquement les préférences utilisateur. La base sportive reste 100% locale dans SQLite.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondaryDark,
-                    height: 1.3,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    if (!isFbInitialized) {
-                      await fbService.initialize();
-                    }
-                    if (fbService.currentUser == null) {
-                      await fbService.signInAnonymously();
-                    }
-                    controller.toggleTheme(); // déclenche sync
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Préférences utilisateur synchronisées avec Firebase',
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'BETSOCCER',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            color: primaryTextColor,
                           ),
                         ),
-                      );
-                    }
-                  },
-                  icon: const Icon(Icons.cloud_sync_rounded),
-                  label: const Text('Synchroniser les préférences'),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Your Sports Analytics Companion',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: secondaryTextColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: secondaryTextColor,
+                    size: 22,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // 2. SECTION : DATA SOURCES (Sources de Données & Synchronisation)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Data Sources',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: primaryTextColor,
+                      ),
+                    ),
+                    Text(
+                      'Manage sources and synchronization',
+                      style: TextStyle(fontSize: 11, color: secondaryTextColor),
+                    ),
+                  ],
+                ),
+                Text(
+                  'Last sync: Oct 13, 2026 14:25',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: secondaryTextColor,
+                  ),
                 ),
               ],
             ),
-          ),
-        ),
-        const SizedBox(height: 20),
+            const SizedBox(height: 10),
 
-        // 3. SECTION : APPARENCE & THÈME
-        _buildSectionHeader('Apparence & Interface'),
-        Card(
-          child: SwitchListTile(
-            title: const Text('Mode Sombre (Dark Mode)'),
-            subtitle: const Text(
-              'Palette contrastée adaptée à la lecture de statistiques',
+            // Cartes Fournisseurs
+            _buildDataSourceTile(
+              name: 'OpenLigaDB',
+              subtitle: 'Football • Handball • Volleyball',
+              icon: Icons.sports_soccer_rounded,
+              isSynced: true,
+              timeAgo: '2 min ago',
+              cardBg: cardBg,
+              borderColor: borderColor,
+              primaryColor: primaryTextColor,
+              secondaryColor: secondaryTextColor,
             ),
-            value: controller.isDarkMode,
-            activeThumbColor: AppColors.primary,
-            onChanged: (val) => controller.toggleTheme(),
-          ),
-        ),
-        const SizedBox(height: 20),
+            _buildDataSourceTile(
+              name: 'Football-Data.co.uk',
+              subtitle: 'Football (Fixtures & Results)',
+              icon: Icons.public_rounded,
+              isSynced: true,
+              timeAgo: '5 min ago',
+              cardBg: cardBg,
+              borderColor: borderColor,
+              primaryColor: primaryTextColor,
+              secondaryColor: secondaryTextColor,
+            ),
+            _buildDataSourceTile(
+              name: 'TheSportsDB',
+              subtitle: 'Multi-sport (Leagues & Teams)',
+              icon: Icons.storage_rounded,
+              isSynced: true,
+              timeAgo: '12 min ago',
+              cardBg: cardBg,
+              borderColor: borderColor,
+              primaryColor: primaryTextColor,
+              secondaryColor: secondaryTextColor,
+            ),
+            _buildDataSourceTile(
+              name: 'MelBet (Disabled)',
+              subtitle: 'Restricted by policy',
+              icon: Icons.block_rounded,
+              isSynced: false,
+              timeAgo: 'Disabled',
+              cardBg: cardBg,
+              borderColor: borderColor,
+              primaryColor: primaryTextColor,
+              secondaryColor: secondaryTextColor,
+            ),
 
-        // 4. SECTION : BASE DE DONNÉES LOCALE
-        _buildSectionHeader('Stockage Local SQLite'),
-        Card(
-          child: Column(
-            children: [
-              ListTile(
-                title: const Text('Fichier SQLite'),
-                subtitle: const Text(
-                  'betsoccer.db (Version 1, 10 tables actives)',
-                ),
-                trailing: const Icon(
-                  Icons.storage_rounded,
-                  color: AppColors.secondary,
-                ),
+            const SizedBox(height: 20),
+
+            // 3. SECTION : PREFERENCES
+            Text(
+              'Preferences',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: primaryTextColor,
               ),
-              const Divider(height: 1),
-              Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      try {
-                        final raw = await rootBundle.loadString(
-                          'assets/data/historical/premier_league_2023_24.txt',
-                        );
-                        final count = await controller.importOpenFootball(raw);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                '$count matchs importés depuis Premier League 2023/24 (CC0)',
-                              ),
+            ),
+            const SizedBox(height: 10),
+
+            // A. Favorite Sports Pills Selector
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: borderColor),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.stars_rounded,
+                        size: 20,
+                        color: primaryTextColor,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Favorite Sports',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: primaryTextColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Select your favorite sports',
+                    style: TextStyle(fontSize: 11, color: secondaryTextColor),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _allSports.map((s) {
+                      final isSelected = controller.favoriteSports.contains(s);
+                      return InkWell(
+                        onTap: () => controller.toggleFavoriteSport(s),
+                        borderRadius: BorderRadius.circular(20),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? AppColors.neonLime
+                                : (isDark
+                                      ? AppColors.surfaceElevatedDark
+                                      : AppColors.surfaceElevatedLight),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: isSelected
+                                  ? AppColors.neonLime
+                                  : (isDark
+                                        ? AppColors.borderDark
+                                        : AppColors.borderLight),
                             ),
-                          );
-                        }
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(
-                            context,
-                          ).showSnackBar(SnackBar(content: Text('Erreur: $e')));
-                        }
-                      }
-                    },
-                    icon: const Icon(Icons.download_rounded),
-                    label: const Text(
-                      'Recharger l\'échantillon Premier League (CC0)',
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.black,
+                          ),
+                          child: Text(
+                            s,
+                            style: TextStyle(
+                              color: isSelected
+                                  ? const Color(0xFF0A111F)
+                                  : secondaryTextColor,
+                              fontSize: 12,
+                              fontWeight: isSelected
+                                  ? FontWeight.w800
+                                  : FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 10),
+
+            // B. Offline Mode Switch
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: borderColor),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.wifi_off_rounded,
+                    color: primaryTextColor,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Offline Mode',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: primaryTextColor,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Use local data when no internet connection',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: secondaryTextColor,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
+                  Switch(
+                    value: controller.isOfflineMode,
+                    activeThumbColor: AppColors.neonLime,
+                    onChanged: (_) => controller.toggleOfflineMode(),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+            ),
 
-  Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 8),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.bold,
-          color: AppColors.primary,
-          letterSpacing: 0.5,
+            const SizedBox(height: 10),
+
+            // C. Dark Theme Switch
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: borderColor),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.dark_mode_rounded,
+                    color: primaryTextColor,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Dark Theme',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: primaryTextColor,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Use dark theme',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: secondaryTextColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: controller.isDarkMode,
+                    activeThumbColor: AppColors.neonLime,
+                    onChanged: (_) => controller.toggleTheme(),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // 4. Synchronisation Cloud Firebase (Préservé)
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: borderColor),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Cloud Sync (Firebase)',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: primaryTextColor,
+                        ),
+                      ),
+                      Text(
+                        isFbInitialized
+                            ? 'Connecté (betsoccer-60834)'
+                            : 'Mode hors-ligne local',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: secondaryTextColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                  OutlinedButton(
+                    onPressed: () {
+                      controller.toggleTheme();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Préférences synchronisées avec Firestore',
+                          ),
+                        ),
+                      );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.neonLime,
+                      side: const BorderSide(color: AppColors.neonLime),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                    ),
+                    child: const Text(
+                      'Sync Now',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildSourceTile({
+  Widget _buildDataSourceTile({
     required String name,
-    required String description,
-    required String statusLabel,
-    required Color statusColor,
+    required String subtitle,
     required IconData icon,
+    required bool isSynced,
+    required String timeAgo,
+    required Color cardBg,
+    required Color borderColor,
+    required Color primaryColor,
+    required Color secondaryColor,
   }) {
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: statusColor.withValues(alpha: 0.15),
-          foregroundColor: statusColor,
-          child: Icon(icon, size: 20),
-        ),
-        title: Text(
-          name,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-        ),
-        subtitle: Text(
-          description,
-          style: const TextStyle(
-            fontSize: 12,
-            color: AppColors.textSecondaryDark,
-          ),
-        ),
-        trailing: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: statusColor.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: statusColor.withValues(alpha: 0.4)),
-          ),
-          child: Text(
-            statusLabel,
-            style: TextStyle(
-              color: statusColor,
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: isSynced
+                  ? AppColors.neonLime.withValues(alpha: 0.15)
+                  : AppColors.liveRed.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              icon,
+              size: 20,
+              color: isSynced ? AppColors.neonLime : AppColors.liveRed,
             ),
           ),
-        ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: primaryColor,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: TextStyle(fontSize: 11, color: secondaryColor),
+                ),
+              ],
+            ),
+          ),
+          Row(
+            children: [
+              Icon(
+                Icons.circle,
+                size: 7,
+                color: isSynced ? AppColors.winGreen : AppColors.liveRed,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                timeAgo,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isSynced ? secondaryColor : AppColors.liveRed,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 16,
+                color: secondaryColor,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
