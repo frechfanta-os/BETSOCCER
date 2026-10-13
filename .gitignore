@@ -2,6 +2,13 @@
 *.class
 *.log
 *.pyc
+__pycache__/
+.pytest_cache/
+.venv/
+venv/
+*.db
+*.sqlite
+*.sqlite3
 *.swp
 .DS_Store
 .atom/

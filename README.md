@@ -47,6 +47,9 @@ L'ensemble des livrables de l'audit approfondi des 12 sources sportives est cons
 - [**recommended-data-architecture.md**](docs/phase-1.5/recommended-data-architecture.md) : Architecture de collecte, déduplication et stabilité du schéma SQLite V1.
 - [**audit-summary.md**](docs/phase-1.5/audit-summary.md) : Synthèse décisionnelle exécutive répondant aux 11 questions clés.
 
+### Collecteur Autonome Crawl4AI
+- [**crawl4ai-collector-report.md**](docs/crawl4ai-collector-report.md) : Rapport d'ingestion autonome Crawl4AI, validation de déduplication et mesures de fraîcheur.
+
 ---
 
 ## 3. Statut d'Avancement des Phases
@@ -54,6 +57,7 @@ L'ensemble des livrables de l'audit approfondi des 12 sources sportives est cons
 - [x] **Phase 0 :** Audit complet, faisabilité et validation architecturale (Terminée).
 - [x] **Phase 1 :** Socle technique Flutter Android-First, base SQLite V1, connecteurs de données, intégration Firebase & CI GitHub Actions (Terminée).
 - [x] **Phase 1.5 :** Audit global des sources sportives, du scraping et des résultats (Terminée).
+- [x] **Collecteur Autonome :** Collecteur multisport avec Crawl4AI, déduplication SQLite, zéro date en dur (Terminé & Validé).
 - [ ] **Phase 2 :** Moteur statistique déterministe (Loi de Poisson, Dixon-Coles, Elo) & Design Tokens.
 - [ ] **Phase 3 :** Tranche verticale & Écrans métiers complets (Live, Fixtures, Historique, Filtres).
 - [ ] **Phase 4 :** Orchestration IA OpenRouter, Backtesting temporel & QA.
@@ -63,6 +67,7 @@ L'ensemble des livrables de l'audit approfondi des 12 sources sportives est cons
 
 ## 4. Commandes de Développement & Validation
 
+### Application Flutter
 ```bash
 # Formater le code Dart
 dart format .
@@ -70,6 +75,21 @@ dart format .
 # Analyse statique (0 erreur requise)
 flutter analyze
 
-# Exécuter les tests automatisés
+# Exécuter les tests automatisés Flutter (25 tests)
 flutter test
+```
+
+### Collecteur Autonome Crawl4AI (Python)
+```bash
+# Activer l'environnement virtuel du collecteur
+source collector/.venv/bin/activate
+
+# Lancer la suite de tests unitaires du collecteur (11 tests)
+python3 -m unittest discover -s collector/tests
+
+# Exécuter un cycle de collecte unique
+python3 -m collector.main --once --db /root/BETSOCCER/betsoccer.db
+
+# Vérifier les données et la déduplication dans la base SQLite
+python3 -m collector.main --verify --db /root/BETSOCCER/betsoccer.db
 ```

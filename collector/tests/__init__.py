@@ -1,0 +1,1 @@
+# BETSOCCER Collector Tests
