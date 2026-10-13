@@ -29,6 +29,7 @@ La Phase 0 a produit un audit exhaustif et validé de faisabilité logicielle et
 - [**security-review.md**](docs/phase-0/security-review.md) : Revue de sécurité, cycle de vie des secrets et standard OTA.
 - [**implementation-roadmap.md**](docs/phase-0/implementation-roadmap.md) : Feuille de route détaillée pour la Phase 1 et les phases suivantes.
 - [**decisions.md**](docs/phase-0/decisions.md) : Registre des décisions d'architecture (ADR-001 à ADR-007).
+- [**melbet-data-access-audit.md**](docs/phase-0/melbet-data-access-audit.md) : Audit prioritaire du web search, scraping et faisabilité des données MelBet.
 
 ---
 
