@@ -37,7 +37,15 @@ Les rapports de Phase 1 et de l'intégration Firebase sont consultables dans [`d
 - [**implementation-report.md**](docs/phase-1/implementation-report.md) : Implémentation du socle Flutter, SQLite V1 et contrôleur réactif.
 - [**data-connectors-report.md**](docs/phase-1/data-connectors-report.md) : Spécification de `SportsDataSource` et des connecteurs.
 - [**testing-report.md**](docs/phase-1/testing-report.md) : Rapport complet des tests (25 tests passés avec 100% de réussite).
-- [**firebase-integration-report.md**](docs/firebase-integration-report.md) : Rapport d'intégration Firebase (projet `betsoccer-60834`).
+### Phase 1.5 — Audit Global des Sources Sportives & Scraping
+L'ensemble des livrables de l'audit approfondi des 12 sources sportives est consultable dans [`docs/phase-1.5/`](docs/phase-1.5/) :
+- [**source-inventory.md**](docs/phase-1.5/source-inventory.md) : Fiches d'identité détaillées des 12 sources analysées.
+- [**source-comparison.md**](docs/phase-1.5/source-comparison.md) : Matrice comparative globale et 3 classements spécialisés.
+- [**scraping-test-results.md**](docs/phase-1.5/scraping-test-results.md) : Relevés de mesures empiriques, tests REST et analyse anti-bot.
+- [**sports-coverage-matrix.md**](docs/phase-1.5/sports-coverage-matrix.md) : Matrice de couverture vérifiée par discipline sportive.
+- [**legal-and-licensing-review.md**](docs/phase-1.5/legal-and-licensing-review.md) : Analyse juridique (droit d'auteur, droit *sui generis*, jurisprudence et RGPD).
+- [**recommended-data-architecture.md**](docs/phase-1.5/recommended-data-architecture.md) : Architecture de collecte, déduplication et stabilité du schéma SQLite V1.
+- [**audit-summary.md**](docs/phase-1.5/audit-summary.md) : Synthèse décisionnelle exécutive répondant aux 11 questions clés.
 
 ---
 
@@ -45,6 +53,7 @@ Les rapports de Phase 1 et de l'intégration Firebase sont consultables dans [`d
 
 - [x] **Phase 0 :** Audit complet, faisabilité et validation architecturale (Terminée).
 - [x] **Phase 1 :** Socle technique Flutter Android-First, base SQLite V1, connecteurs de données, intégration Firebase & CI GitHub Actions (Terminée).
+- [x] **Phase 1.5 :** Audit global des sources sportives, du scraping et des résultats (Terminée).
 - [ ] **Phase 2 :** Moteur statistique déterministe (Loi de Poisson, Dixon-Coles, Elo) & Design Tokens.
 - [ ] **Phase 3 :** Tranche verticale & Écrans métiers complets (Live, Fixtures, Historique, Filtres).
 - [ ] **Phase 4 :** Orchestration IA OpenRouter, Backtesting temporel & QA.
