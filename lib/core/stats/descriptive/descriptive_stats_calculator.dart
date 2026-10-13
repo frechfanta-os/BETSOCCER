@@ -11,16 +11,21 @@ class DescriptiveStatsCalculator {
     required List<MatchEntity> matches,
     int limit = 5,
     DateTime? cutoffDate,
+    String? excludeMatchId,
   }) {
     // 1. Filtrer les matchs terminés valides avec résultat
     var teamMatches = matches.where((m) {
+      if (excludeMatchId != null && m.id == excludeMatchId) {
+        return false;
+      }
       if (m.status != MatchStatus.finished || m.result == null) {
         return false;
       }
       if (m.result!.homeScore == null || m.result!.awayScore == null) {
         return false;
       }
-      if (cutoffDate != null && m.utcKickoff.isAfter(cutoffDate)) {
+      // Étanchéité temporelle stricte : aucun match à ou postérieur à cutoffDate
+      if (cutoffDate != null && !m.utcKickoff.isBefore(cutoffDate)) {
         return false;
       }
       return m.homeTeamId == teamId || m.awayTeamId == teamId;
@@ -88,6 +93,7 @@ class DescriptiveStatsCalculator {
     required String teamId,
     required List<MatchEntity> matches,
     DateTime? cutoffDate,
+    String? excludeMatchId,
   }) {
     int homeMatches = 0;
     int homeWins = 0;
@@ -104,13 +110,17 @@ class DescriptiveStatsCalculator {
     int awayConceded = 0;
 
     for (final m in matches) {
+      if (excludeMatchId != null && m.id == excludeMatchId) {
+        continue;
+      }
       if (m.status != MatchStatus.finished || m.result == null) {
         continue;
       }
       if (m.result!.homeScore == null || m.result!.awayScore == null) {
         continue;
       }
-      if (cutoffDate != null && m.utcKickoff.isAfter(cutoffDate)) {
+      // Étanchéité temporelle stricte
+      if (cutoffDate != null && !m.utcKickoff.isBefore(cutoffDate)) {
         continue;
       }
 
@@ -168,6 +178,7 @@ class DescriptiveStatsCalculator {
     required String teamBName,
     required List<MatchEntity> matches,
     DateTime? cutoffDate,
+    String? excludeMatchId,
   }) {
     int total = 0;
     int aWins = 0;
@@ -177,13 +188,17 @@ class DescriptiveStatsCalculator {
     int bGoals = 0;
 
     for (final m in matches) {
+      if (excludeMatchId != null && m.id == excludeMatchId) {
+        continue;
+      }
       if (m.status != MatchStatus.finished || m.result == null) {
         continue;
       }
       if (m.result!.homeScore == null || m.result!.awayScore == null) {
         continue;
       }
-      if (cutoffDate != null && m.utcKickoff.isAfter(cutoffDate)) {
+      // Étanchéité temporelle stricte
+      if (cutoffDate != null && !m.utcKickoff.isBefore(cutoffDate)) {
         continue;
       }
 

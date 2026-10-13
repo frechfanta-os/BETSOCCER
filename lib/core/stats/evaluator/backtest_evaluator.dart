@@ -11,11 +11,16 @@ class BacktestEvaluationMetrics {
   final int totalEvaluatedMatches;
   final int correctPredictionsCount;
   final double accuracy; // Hit rate %
+  final double accuracyWilsonLower; // Borne inférieure Wilson 95%
+  final double accuracyWilsonUpper; // Borne supérieure Wilson 95%
   final double brierScore; // [0.0 (parfait) à 2.0]
+  final double brierStandardError; // Erreur type de l'estimateur de Brier
+  final double brierConfidenceIntervalLower; // Borne inf IC 95% Brier
+  final double brierConfidenceIntervalUpper; // Borne sup IC 95% Brier
   final double logLoss; // Cross-entropy
   final double
-  baselineUniformBrierScore; // Référence naïve uniforme (1/3, 1/3, 1/3)
-  final double baselineUniformLogLoss;
+  baselineUniformBrierScore; // Référence naïve uniforme (1/3, 1/3, 1/3) = 2/3
+  final double baselineUniformLogLoss; // ln(3) = 1.0986
   final double brierSkillScore; // BSS: 1 - (BS_model / BS_baseline)
   final double expectedCalibrationError; // ECE
   final List<CalibrationBin> calibrationBins;
@@ -25,7 +30,12 @@ class BacktestEvaluationMetrics {
     required this.totalEvaluatedMatches,
     required this.correctPredictionsCount,
     required this.accuracy,
+    this.accuracyWilsonLower = 0.0,
+    this.accuracyWilsonUpper = 1.0,
     required this.brierScore,
+    this.brierStandardError = 0.0,
+    this.brierConfidenceIntervalLower = 0.0,
+    this.brierConfidenceIntervalUpper = 2.0,
     required this.logLoss,
     required this.baselineUniformBrierScore,
     required this.baselineUniformLogLoss,
@@ -53,6 +63,27 @@ class CalibrationBin {
 
 /// Évaluateur de backtesting chronologique sans fuite temporelle
 class BacktestEvaluator {
+  /// Calcule l'intervalle de confiance de Wilson à 95% pour une proportion
+  static (double, double) computeWilsonScoreInterval(
+    int successes,
+    int total, {
+    double z = 1.95996, // Seuil bilatéral 95%
+  }) {
+    if (total == 0) return (0.0, 0.0);
+    final p = successes / total;
+    final z2 = z * z;
+    final denominator = 1.0 + (z2 / total);
+    final center = (p + (z2 / (2.0 * total))) / denominator;
+    final margin =
+        (z *
+            math.sqrt((p * (1.0 - p) / total) + (z2 / (4.0 * total * total)))) /
+        denominator;
+    return (
+      double.parse(math.max(0.0, center - margin).toStringAsFixed(4)),
+      double.parse(math.min(1.0, center + margin).toStringAsFixed(4)),
+    );
+  }
+
   /// Exécute une validation walk-forward stricte sur une série chronologique de matchs
   static BacktestEvaluationMetrics evaluateModel({
     required String modelName,
@@ -97,6 +128,7 @@ class BacktestEvaluator {
     double totalUniformLogLoss = 0.0;
     int correctPredictions = 0;
     int evaluatedMatches = 0;
+    final individualBriers = <double>[];
 
     // Structure pour les bins de calibration (5 bins : 0-0.2, 0.2-0.4, 0.4-0.6, 0.6-0.8, 0.8-1.0)
     final binSampleCounts = List<int>.filled(5, 0);
@@ -105,11 +137,22 @@ class BacktestEvaluator {
 
     const eps = 1e-6;
 
-    // 3. Boucle walk-forward (aucun regard vers le futur)
-    for (int i = minHistoryBeforeEvaluation; i < finishedMatches.length; i++) {
+    // 3. Boucle walk-forward causale stricte (zéro fuite temporelle, ni future ni contemporaine)
+    for (int i = 0; i < finishedMatches.length; i++) {
       final targetMatch = finishedMatches[i];
-      // Tout l'historique STRICTEMENT antérieur au match cible
-      final historyBefore = finishedMatches.sublist(0, i);
+      // Tout l'historique STRICTEMENT antérieur au coup d'envoi du match cible
+      // Élimine formellement toute contamination par des matchs simultanés (même date et heure)
+      final historyBefore = finishedMatches
+          .where(
+            (m) =>
+                m.id != targetMatch.id &&
+                m.utcKickoff.isBefore(targetMatch.utcKickoff),
+          )
+          .toList();
+
+      if (historyBefore.length < minHistoryBeforeEvaluation) {
+        continue;
+      }
 
       final prediction = predictFn(targetMatch, historyBefore);
       if (!prediction.isReliable && prediction.homeWinProb == 0.0) {
@@ -146,6 +189,7 @@ class BacktestEvaluator {
       final brierInstance =
           math.pow(p1 - y1, 2) + math.pow(pX - yX, 2) + math.pow(p2 - y2, 2);
       totalModelBrier += brierInstance;
+      individualBriers.add(brierInstance.toDouble());
 
       // Calcul Log-Loss
       final logLossInstance =
@@ -190,7 +234,12 @@ class BacktestEvaluator {
         totalEvaluatedMatches: 0,
         correctPredictionsCount: 0,
         accuracy: 0.0,
+        accuracyWilsonLower: 0.0,
+        accuracyWilsonUpper: 0.0,
         brierScore: 0.0,
+        brierStandardError: 0.0,
+        brierConfidenceIntervalLower: 0.0,
+        brierConfidenceIntervalUpper: 0.0,
         logLoss: 0.0,
         baselineUniformBrierScore: 0.0,
         baselineUniformLogLoss: 0.0,
@@ -205,6 +254,27 @@ class BacktestEvaluator {
     final meanUniformBrier = totalUniformBrier / evaluatedMatches;
     final meanUniformLogLoss = totalUniformLogLoss / evaluatedMatches;
     final accuracy = correctPredictions / evaluatedMatches;
+
+    // Intervalles analytiques d'incertitude
+    final (wilsonLower, wilsonUpper) = computeWilsonScoreInterval(
+      correctPredictions,
+      evaluatedMatches,
+    );
+
+    // Variance et écart-type empirique pour le Brier Score
+    double brierVariance = 0.0;
+    if (evaluatedMatches > 1) {
+      for (final bs in individualBriers) {
+        brierVariance += math.pow(bs - meanBrier, 2);
+      }
+      brierVariance /= (evaluatedMatches - 1);
+    }
+    final brierStd = math.sqrt(brierVariance);
+    final brierSe = evaluatedMatches > 0
+        ? brierStd / math.sqrt(evaluatedMatches)
+        : 0.0;
+    final brierCiLower = math.max(0.0, meanBrier - (1.95996 * brierSe));
+    final brierCiUpper = math.min(2.0, meanBrier + (1.95996 * brierSe));
 
     // Brier Skill Score : BSS = 1 - (BS_model / BS_ref)
     final bss = meanUniformBrier > 0
@@ -252,7 +322,16 @@ class BacktestEvaluator {
       totalEvaluatedMatches: evaluatedMatches,
       correctPredictionsCount: correctPredictions,
       accuracy: double.parse(accuracy.toStringAsFixed(4)),
+      accuracyWilsonLower: wilsonLower,
+      accuracyWilsonUpper: wilsonUpper,
       brierScore: double.parse(meanBrier.toStringAsFixed(4)),
+      brierStandardError: double.parse(brierSe.toStringAsFixed(4)),
+      brierConfidenceIntervalLower: double.parse(
+        brierCiLower.toStringAsFixed(4),
+      ),
+      brierConfidenceIntervalUpper: double.parse(
+        brierCiUpper.toStringAsFixed(4),
+      ),
       logLoss: double.parse(meanLogLoss.toStringAsFixed(4)),
       baselineUniformBrierScore: double.parse(
         meanUniformBrier.toStringAsFixed(4),

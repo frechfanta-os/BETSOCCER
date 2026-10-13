@@ -35,19 +35,24 @@ class EloRatingEngine {
   Map<String, double> computeRatings({
     required List<MatchEntity> matches,
     DateTime? cutoffDate,
+    String? excludeMatchId,
   }) {
     final ratings = <String, double>{};
     final matchCounts = <String, int>{};
 
     // 1. Filtrer et trier chronologiquement
     final sortedMatches = matches.where((m) {
+      if (excludeMatchId != null && m.id == excludeMatchId) {
+        return false;
+      }
       if (m.status != MatchStatus.finished || m.result == null) {
         return false;
       }
       if (m.result!.homeScore == null || m.result!.awayScore == null) {
         return false;
       }
-      if (cutoffDate != null && m.utcKickoff.isAfter(cutoffDate)) {
+      // Étanchéité temporelle stricte : aucun match à ou postérieur à cutoffDate (inégalité stricte <)
+      if (cutoffDate != null && !m.utcKickoff.isBefore(cutoffDate)) {
         return false;
       }
       return true;
@@ -119,16 +124,18 @@ class EloRatingEngine {
     final ratings = computeRatings(
       matches: historicalMatches,
       cutoffDate: cutoff,
+      excludeMatchId: match.id,
     );
 
     // Comptage des matchs préalables de chaque équipe
     int homeMatchesCount = 0;
     int awayMatchesCount = 0;
     for (final m in historicalMatches) {
+      if (m.id == match.id) continue;
       if (m.status != MatchStatus.finished || m.result == null) {
         continue;
       }
-      if (m.utcKickoff.isAfter(cutoff)) {
+      if (!m.utcKickoff.isBefore(cutoff)) {
         continue;
       }
       if (m.homeTeamId == match.homeTeamId ||
@@ -144,7 +151,9 @@ class EloRatingEngine {
     final totalHistory = historicalMatches
         .where(
           (m) =>
-              m.status == MatchStatus.finished && !m.utcKickoff.isAfter(cutoff),
+              m.id != match.id &&
+              m.status == MatchStatus.finished &&
+              m.utcKickoff.isBefore(cutoff),
         )
         .length;
 

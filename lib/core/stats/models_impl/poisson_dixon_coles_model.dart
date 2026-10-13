@@ -5,14 +5,19 @@ import '../models/prediction_result.dart';
 
 /// Modèle bivarié de Poisson avec ajustement de Dixon-Coles pour le football
 class PoissonDixonColesModel {
-  // Paramètre d'ajustement Dixon-Coles pour corrélation des scores bas (0-0, 1-0, 0-1, 1-1)
+  /// Paramètre de corrélation Dixon-Coles pour scores bas (0-0, 1-0, 0-1, 1-1).
+  /// Valeur empirique standard Dixon & Coles (1997) pour les championnats européens:
+  /// typiquement rho in [-0.10, -0.03]. rho = -0.06 compense la sous-estimation d'indépendance.
   final double rho;
-  // Facteur de shrinkage pseudo-counts pour les petits échantillons
+
+  /// Facteur de régularisation bayésienne par pseudo-observations (shrinkage).
+  /// C = 5.0 représente le poids informatif équivalent à 5 matchs moyens de championnat,
+  /// stabilisant la variance des forces d'attaque et de défense sur petits échantillons.
   final double shrinkageC;
 
   const PoissonDixonColesModel({
-    this.rho = -0.06, // Valeur empirique standard pour les ligues européennes
-    this.shrinkageC = 5.0, // Constante de régularisation bayésienne
+    this.rho = -0.06, // Dixon & Coles (1997)
+    this.shrinkageC = 5.0, // Constante bayésienne de stabilisation
   });
 
   /// Précalcule le logarithme des factorielles jusqu'à 15
@@ -70,15 +75,22 @@ class PoissonDixonColesModel {
       );
     }
 
-    // 2. Filtrer l'historique valide (antérieur à la date de coupure pour éviter tout data leakage)
+    final effectiveCutoff = cutoffDate ?? match.utcKickoff;
+
+    // 2. Filtrer l'historique valide (strictement antérieur à la date de coupure pour éviter tout data leakage)
     final validHistory = historicalMatches.where((m) {
+      // Exclure formellement le match cible lui-même s'il est présent dans l'historique
+      if (m.id == match.id) {
+        return false;
+      }
       if (m.status != MatchStatus.finished || m.result == null) {
         return false;
       }
       if (m.result!.homeScore == null || m.result!.awayScore == null) {
         return false;
       }
-      if (cutoffDate != null && m.utcKickoff.isAfter(cutoffDate)) {
+      // Étanchéité temporelle stricte : aucun match à ou postérieur à effectiveCutoff (inégalité stricte <)
+      if (!m.utcKickoff.isBefore(effectiveCutoff)) {
         return false;
       }
       return true;
@@ -273,7 +285,7 @@ class PoissonDixonColesModel {
       totalMatchesAnalyzed: totalCompMatches,
       homeTeamMatchesCount: homeMatchesCount,
       awayTeamMatchesCount: awayMatchesCount,
-      temporalCutoff: cutoffDate ?? match.utcKickoff,
+      temporalCutoff: effectiveCutoff,
       confidenceScore: double.parse(confidenceScore.toStringAsFixed(3)),
       entropy: double.parse(h.toStringAsFixed(3)),
       disclaimer: status == EstimationStatus.shrinkageEstimation
