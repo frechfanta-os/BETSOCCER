@@ -135,11 +135,15 @@ class SportsController extends ChangeNotifier {
 
   /// Match à la une (Hero Banner sur Home)
   MatchEntity? get featuredMatch {
-    if (_liveMatches.isNotEmpty) {
-      return _liveMatches.first;
+    final live = filteredLiveMatches;
+    if (live.isNotEmpty) {
+      return live.first;
+    }
+    final upcoming = filteredUpcomingMatches;
+    if (upcoming.isNotEmpty) {
+      return upcoming.first;
     }
     if (_allMatches.isNotEmpty) {
-      // Priorité aux matchs avec résultat ou aux grands matchs
       final withResult = _allMatches.where((m) => m.result != null).toList();
       if (withResult.isNotEmpty) return withResult.first;
       return _allMatches.first;
@@ -180,31 +184,24 @@ class SportsController extends ChangeNotifier {
     return _filterMatchesBySport(matches);
   }
 
-  /// Matchs en direct filtrés (Live Center)
+  /// Matchs en direct filtrés (Live Center : UNIQUEMENT les rencontres en direct actif)
   List<MatchEntity> get filteredLiveMatches {
-    // Si la base ne contient pas de statut 'live' actif en temps réel,
-    // on présente les matchs récents en cours / terminés comme centre de live
-    final base = _liveMatches.isNotEmpty
-        ? _liveMatches
-        : _allMatches
-              .where(
-                (m) =>
-                    m.status == MatchStatus.finished ||
-                    m.status == MatchStatus.live,
-              )
-              .toList();
-    return _filterMatchesBySport(base.isNotEmpty ? base : _allMatches);
+    final liveOnly = _liveMatches.where((m) => m.status == MatchStatus.live).toList();
+    if (liveOnly.isEmpty) {
+      final inPlay = _allMatches.where((m) => m.status == MatchStatus.live).toList();
+      return _filterMatchesBySport(inPlay);
+    }
+    return _filterMatchesBySport(liveOnly);
   }
 
-  /// Matchs à venir filtrés par date et sport (Fixtures)
+  /// Matchs à venir filtrés par date et sport (Fixtures : UNIQUEMENT les rencontres avant-match)
   List<MatchEntity> get filteredUpcomingMatches {
-    var list = _allMatches
-        .where((m) => m.status == MatchStatus.upcoming)
-        .toList();
-    if (list.isEmpty) list = _allMatches;
+    final combined = <MatchEntity>{
+      ..._upcomingMatches.where((m) => m.status == MatchStatus.upcoming),
+      ..._allMatches.where((m) => m.status == MatchStatus.upcoming),
+    }.toList();
 
-    // Filtre par sport
-    list = _filterMatchesBySport(list);
+    var list = _filterMatchesBySport(combined);
 
     // Filtre par compétition si sélectionnée
     if (_selectedCompetitionFilter != 'All Competitions') {

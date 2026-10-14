@@ -80,23 +80,22 @@ class SportsRepository {
       return cached;
     }
 
-    if (competitionId != null) {
-      for (final source in dataSources.where(
-        (s) => s.isEnabled && s.supportsUpcomingMatches,
-      )) {
-        try {
-          final remote = await source.fetchUpcomingMatches(
+    final targetComp = competitionId ?? 'comp_old_bl1';
+    for (final source in dataSources.where(
+      (s) => s.isEnabled && s.supportsUpcomingMatches,
+    )) {
+      try {
+        final remote = await source.fetchUpcomingMatches(
+          competitionId: targetComp,
+        );
+        if (remote.isNotEmpty) {
+          await sportsDao.upsertMatches(remote);
+          return await sportsDao.getMatches(
             competitionId: competitionId,
+            status: MatchStatus.upcoming.name,
           );
-          if (remote.isNotEmpty) {
-            await sportsDao.upsertMatches(remote);
-            return await sportsDao.getMatches(
-              competitionId: competitionId,
-              status: MatchStatus.upcoming.name,
-            );
-          }
-        } catch (_) {}
-      }
+        }
+      } catch (_) {}
     }
 
     return cached;
