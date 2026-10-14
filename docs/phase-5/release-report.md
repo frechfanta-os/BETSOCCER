@@ -45,7 +45,15 @@
   - HTML scraping, JSON-LD extractors, Crawl4AI connectors, caching and validators.
 
 ## 5. Artifacts and Distribution Strategy
-- **Standard Release APK**: `app-release.apk`
-- **Versioned Release APK**: `BETSOCCER-v1.0.0.apk`
+- **Standard Release APK**: `app-release.apk` (53,445,502 bytes)
+  - Direct Download: [app-release.apk](https://github.com/frechfanta-os/BETSOCCER/releases/download/v1.0.0/app-release.apk)
+- **Versioned Release APK**: `BETSOCCER-v1.0.0.apk` (53,445,502 bytes)
+  - Direct Download: [BETSOCCER-v1.0.0.apk](https://github.com/frechfanta-os/BETSOCCER/releases/download/v1.0.0/BETSOCCER-v1.0.0.apk)
 - **Integrity Checksum File**: `app-release.apk.sha256`
-- **Pipeline**: Automated build and release publication through GitHub Actions (`.github/workflows/build_apk.yml`), fully aligned with CimentFlow's standard release architecture.
+  - Direct Download: [app-release.apk.sha256](https://github.com/frechfanta-os/BETSOCCER/releases/download/v1.0.0/app-release.apk.sha256)
+- **Verified SHA-256**:
+  `2e1ffa0f1a16379b4fe49ee20e10b364937bf5f26ba6ba05ae121f4417869f9a`
+- **Keystore Signature**:
+  Validated against keystore `android/app/betsoccer.keystore` during CI pipeline.
+- **Pipeline Execution**:
+  GitHub Actions run [#38627781718](https://github.com/frechfanta-os/BETSOCCER/actions/runs/38627781718) completed with status `success`. Release published live at [GitHub Releases v1.0.0](https://github.com/frechfanta-os/BETSOCCER/releases/tag/v1.0.0).
