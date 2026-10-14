@@ -6,6 +6,7 @@ class AppConfig {
   final String appTitle;
   final String applicationId;
   final bool melbetEnabled;
+  final String openLigaDbBaseUrl;
   final String theSportsDbBaseUrl;
   final String theSportsDbApiKey;
   final String footballDataOrgBaseUrl;
@@ -17,6 +18,7 @@ class AppConfig {
     this.applicationId = 'com.ghdinteractivestudio.betsoccer',
     this.melbetEnabled =
         false, // STRICTEMENT DÉSACTIVÉ PAR POLITIQUE (DISABLED_BY_POLICY)
+    this.openLigaDbBaseUrl = 'https://api.openligadb.de',
     this.theSportsDbBaseUrl = 'https://www.thesportsdb.com/api/v1/json',
     this.theSportsDbApiKey = '3', // Clé de test publique gratuite officielle
     this.footballDataOrgBaseUrl = 'https://api.football-data.org/v4',

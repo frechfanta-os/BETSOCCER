@@ -150,14 +150,82 @@ class TheSportsDbDataSource implements SportsDataSource {
     }
   }
 
+  static String _resolveLeagueId(String competitionId) {
+    if (competitionId.startsWith('tsdb_comp_')) {
+      return competitionId.replaceFirst('tsdb_comp_', '');
+    }
+    final low = competitionId.toLowerCase();
+    if (low.contains('e0') || low.contains('pl') || low.contains('premier')) return '4328';
+    if (low.contains('sp1') || low.contains('laliga')) return '4335';
+    if (low.contains('i1') || low.contains('seriea')) return '4332';
+    if (low.contains('f1') || low.contains('ligue1')) return '4334';
+    if (low.contains('d1') || low.contains('bl1') || low.contains('bundesliga')) return '4331';
+    return '4328';
+  }
+
   @override
   Future<List<MatchEntity>> fetchUpcomingMatches({
     required String competitionId,
     DateTime? from,
     DateTime? to,
   }) async {
-    // Dans le plan V1 gratuit, les événements à venir sont interrogés par ID de ligue
-    return [];
+    try {
+      final leagueId = _resolveLeagueId(competitionId);
+      final uri = _buildUri('eventsnextleague.php', {'id': leagueId});
+      final response = await client.get(uri);
+
+      if (response.statusCode != 200) {
+        throw NetworkException('Erreur TheSportsDB: ${response.statusCode}', response.statusCode);
+      }
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final events = data['events'] as List<dynamic>? ?? [];
+      final matches = <MatchEntity>[];
+
+      for (final ev in events) {
+        if (ev is Map<String, dynamic>) {
+          final idEvent = ev['idEvent']?.toString() ?? '';
+          final homeName = ev['strHomeTeam'] as String? ?? 'Home';
+          final awayName = ev['strAwayTeam'] as String? ?? 'Away';
+          final homeId = 'team_${ev['idHomeTeam'] ?? homeName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}';
+          final awayId = 'team_${ev['idAwayTeam'] ?? awayName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}';
+
+          final dateStr = ev['dateEvent'] as String? ?? '';
+          final timeStr = ev['strTime'] as String? ?? '00:00:00';
+          DateTime kickoff;
+          try {
+            kickoff = DateTime.parse('${dateStr}T${timeStr}Z').toUtc();
+          } catch (_) {
+            kickoff = DateTime.tryParse(dateStr)?.toUtc() ?? DateTime.now().toUtc();
+          }
+
+          matches.add(
+            MatchEntity(
+              id: 'match_tsdb_$idEvent',
+              sportId: 'sport_football',
+              competitionId: competitionId,
+              homeTeamId: homeId,
+              homeTeamName: homeName,
+              homeTeamBadge: ev['strHomeTeamBadge'] as String? ?? ev['strThumb'] as String?,
+              awayTeamId: awayId,
+              awayTeamName: awayName,
+              awayTeamBadge: ev['strAwayTeamBadge'] as String?,
+              utcKickoff: kickoff,
+              status: MatchStatus.upcoming,
+              roundLabel: ev['intRound']?.toString(),
+              sourceProvider: providerId,
+              sourceMatchId: idEvent,
+              lastSyncedAt: DateTime.now().toUtc(),
+            ),
+          );
+        }
+      }
+
+      return matches;
+    } catch (e) {
+      if (e is AppException) rethrow;
+      throw NetworkException('Erreur lors de la récupération des matchs à venir TheSportsDB', null, e);
+    }
   }
 
   @override

@@ -7,6 +7,7 @@ import 'core/services/firebase_service.dart';
 import 'core/services/firebase_sync_adapter.dart';
 import 'core/theme/app_theme.dart';
 import 'features/sports/data/sources/openfootball_data_source.dart';
+import 'features/sports/data/sources/openligadb_data_source.dart';
 import 'features/sports/data/sources/thesportsdb_data_source.dart';
 import 'features/sports/data/sources/football_data_org_data_source.dart';
 import 'features/sports/data/sources/melbet_data_source.dart';
@@ -33,6 +34,7 @@ void main() async {
 
   // 3. Configuration des connecteurs de données sportives
   final openFootballSource = OpenFootballDataSource();
+  final openLigaDbSource = OpenLigaDbDataSource();
   final theSportsDbSource = TheSportsDbDataSource();
   final footballDataOrgSource = FootballDataOrgDataSource();
   final melbetSource = MelbetDataSource(); // Strictement DISABLED_BY_POLICY
@@ -41,6 +43,7 @@ void main() async {
     sportsDao: sportsDao,
     dataSources: [
       openFootballSource,
+      openLigaDbSource,
       theSportsDbSource,
       footballDataOrgSource,
       melbetSource,

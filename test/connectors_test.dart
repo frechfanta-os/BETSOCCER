@@ -2,9 +2,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:betsoccer/core/errors/app_exception.dart';
 import 'package:betsoccer/features/sports/data/sources/melbet_data_source.dart';
 import 'package:betsoccer/features/sports/data/sources/openfootball_data_source.dart';
+import 'package:betsoccer/features/sports/data/sources/openligadb_data_source.dart';
 import 'package:betsoccer/features/sports/data/sources/thesportsdb_data_source.dart';
 import 'package:betsoccer/features/sports/data/sources/football_data_org_data_source.dart';
 import 'package:betsoccer/features/sports/domain/interfaces/sports_data_source.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 void main() {
   group('Data Connectors Architecture & Policy Compliance Tests', () {
@@ -161,6 +164,121 @@ void main() {
       test('enabled when API key is provided', () {
         final fdo = FootballDataOrgDataSource(apiKey: 'dummy_api_key_test');
         expect(fdo.isEnabled, isTrue);
+      });
+    });
+
+    group('OpenLigaDbDataSource Compliance & Live/Upcoming Capabilities', () {
+      final oldb = OpenLigaDbDataSource();
+
+      test('capabilities and metadata', () {
+        expect(oldb.isEnabled, isTrue);
+        expect(oldb.providerId, equals('openligadb'));
+        expect(oldb.accessStatus, equals(ConnectorAccessStatus.available));
+        expect(oldb.supportsSportsDiscovery, isTrue);
+        expect(oldb.supportsCompetitions, isTrue);
+        expect(oldb.supportsUpcomingMatches, isTrue);
+        expect(oldb.supportsLiveMatches, isTrue);
+        expect(oldb.supportsHistoricalMatches, isTrue);
+        expect(oldb.supportsMatchDetails, isTrue);
+      });
+
+      test('fetchSports returns Football, Handball, Volleyball', () async {
+        final sports = await oldb.fetchSports();
+        expect(sports.length, equals(3));
+        expect(sports.map((s) => s.code), containsAll(['SOCCER', 'HANDBALL', 'VOLLEYBALL']));
+      });
+
+      test('fetchUpcomingMatches parses upcoming matches correctly', () async {
+        final mockClient = MockClient((request) async {
+          final jsonResponse = '''
+          [
+            {
+              "matchID": 9901,
+              "matchDateTimeUTC": "2026-10-17T13:30:00Z",
+              "team1": {"teamId": 40, "teamName": "FC Bayern München"},
+              "team2": {"teamId": 7, "teamName": "Borussia Dortmund"},
+              "matchIsFinished": false,
+              "matchResults": [],
+              "group": {"groupOrderID": 8, "groupName": "8. Spieltag"}
+            }
+          ]
+          ''';
+          return http.Response(jsonResponse, 200, headers: {'content-type': 'application/json'});
+        });
+
+        final source = OpenLigaDbDataSource(httpClient: mockClient);
+        final matches = await source.fetchUpcomingMatches(competitionId: 'comp_old_bl1');
+
+        expect(matches.length, equals(1));
+        final m = matches.first;
+        expect(m.homeTeamName, equals('FC Bayern München'));
+        expect(m.awayTeamName, equals('Borussia Dortmund'));
+        expect(m.status.name, equals('upcoming'));
+        expect(m.matchday, equals(8));
+      });
+
+      test('fetchLiveMatches extracts live matches correctly', () async {
+        final nowIso = DateTime.now().toUtc().toIso8601String();
+        final mockClient = MockClient((request) async {
+          final jsonResponse = '''
+          [
+            {
+              "matchID": 9902,
+              "matchDateTimeUTC": "$nowIso",
+              "team1": {"teamId": 10, "teamName": "Leverkusen"},
+              "team2": {"teamId": 20, "teamName": "Stuttgart"},
+              "matchIsFinished": false,
+              "matchResults": [
+                {"resultName": "Halbzeitergebnis", "pointsTeam1": 1, "pointsTeam2": 0, "resultOrderID": 1}
+              ],
+              "group": {"groupOrderID": 8, "groupName": "8. Spieltag"}
+            }
+          ]
+          ''';
+          return http.Response(jsonResponse, 200, headers: {'content-type': 'application/json'});
+        });
+
+        final source = OpenLigaDbDataSource(httpClient: mockClient);
+        final liveMatches = await source.fetchLiveMatches();
+
+        expect(liveMatches.length, equals(1));
+        final m = liveMatches.first;
+        expect(m.homeTeamName, equals('Leverkusen'));
+        expect(m.awayTeamName, equals('Stuttgart'));
+        expect(m.status.name, equals('live'));
+      });
+    });
+
+    group('TheSportsDbDataSource Upcoming Matches Integration', () {
+      test('fetchUpcomingMatches parses eventsnextleague response', () async {
+        final mockClient = MockClient((request) async {
+          final jsonResponse = '''
+          {
+            "events": [
+              {
+                "idEvent": "100200",
+                "strEvent": "Arsenal vs Chelsea",
+                "strHomeTeam": "Arsenal",
+                "strAwayTeam": "Chelsea",
+                "dateEvent": "2026-10-18",
+                "strTime": "16:30:00",
+                "intRound": "9"
+              }
+            ]
+          }
+          ''';
+          return http.Response(jsonResponse, 200, headers: {'content-type': 'application/json'});
+        });
+
+        final source = TheSportsDbDataSource(httpClient: mockClient);
+        final matches = await source.fetchUpcomingMatches(competitionId: 'comp_fduk_e0');
+
+        expect(matches.length, equals(1));
+        final m = matches.first;
+        expect(m.homeTeamName, equals('Arsenal'));
+        expect(m.awayTeamName, equals('Chelsea'));
+        expect(m.status.name, equals('upcoming'));
+        expect(m.sourceMatchId, equals('100200'));
       });
     });
   });
