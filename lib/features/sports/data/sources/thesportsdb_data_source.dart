@@ -155,11 +155,23 @@ class TheSportsDbDataSource implements SportsDataSource {
       return competitionId.replaceFirst('tsdb_comp_', '');
     }
     final low = competitionId.toLowerCase();
-    if (low.contains('e0') || low.contains('pl') || low.contains('premier')) return '4328';
-    if (low.contains('sp1') || low.contains('laliga')) return '4335';
-    if (low.contains('i1') || low.contains('seriea')) return '4332';
-    if (low.contains('f1') || low.contains('ligue1')) return '4334';
-    if (low.contains('d1') || low.contains('bl1') || low.contains('bundesliga')) return '4331';
+    if (low.contains('e0') || low.contains('pl') || low.contains('premier')) {
+      return '4328';
+    }
+    if (low.contains('sp1') || low.contains('laliga')) {
+      return '4335';
+    }
+    if (low.contains('i1') || low.contains('seriea')) {
+      return '4332';
+    }
+    if (low.contains('f1') || low.contains('ligue1')) {
+      return '4334';
+    }
+    if (low.contains('d1') ||
+        low.contains('bl1') ||
+        low.contains('bundesliga')) {
+      return '4331';
+    }
     return '4328';
   }
 
@@ -175,7 +187,10 @@ class TheSportsDbDataSource implements SportsDataSource {
       final response = await client.get(uri);
 
       if (response.statusCode != 200) {
-        throw NetworkException('Erreur TheSportsDB: ${response.statusCode}', response.statusCode);
+        throw NetworkException(
+          'Erreur TheSportsDB: ${response.statusCode}',
+          response.statusCode,
+        );
       }
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -187,8 +202,10 @@ class TheSportsDbDataSource implements SportsDataSource {
           final idEvent = ev['idEvent']?.toString() ?? '';
           final homeName = ev['strHomeTeam'] as String? ?? 'Home';
           final awayName = ev['strAwayTeam'] as String? ?? 'Away';
-          final homeId = 'team_${ev['idHomeTeam'] ?? homeName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}';
-          final awayId = 'team_${ev['idAwayTeam'] ?? awayName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}';
+          final homeId =
+              'team_${ev['idHomeTeam'] ?? homeName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}';
+          final awayId =
+              'team_${ev['idAwayTeam'] ?? awayName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}';
 
           final dateStr = ev['dateEvent'] as String? ?? '';
           final timeStr = ev['strTime'] as String? ?? '00:00:00';
@@ -196,7 +213,8 @@ class TheSportsDbDataSource implements SportsDataSource {
           try {
             kickoff = DateTime.parse('${dateStr}T${timeStr}Z').toUtc();
           } catch (_) {
-            kickoff = DateTime.tryParse(dateStr)?.toUtc() ?? DateTime.now().toUtc();
+            kickoff =
+                DateTime.tryParse(dateStr)?.toUtc() ?? DateTime.now().toUtc();
           }
 
           matches.add(
@@ -206,7 +224,9 @@ class TheSportsDbDataSource implements SportsDataSource {
               competitionId: competitionId,
               homeTeamId: homeId,
               homeTeamName: homeName,
-              homeTeamBadge: ev['strHomeTeamBadge'] as String? ?? ev['strThumb'] as String?,
+              homeTeamBadge:
+                  ev['strHomeTeamBadge'] as String? ??
+                  ev['strThumb'] as String?,
               awayTeamId: awayId,
               awayTeamName: awayName,
               awayTeamBadge: ev['strAwayTeamBadge'] as String?,
@@ -224,7 +244,11 @@ class TheSportsDbDataSource implements SportsDataSource {
       return matches;
     } catch (e) {
       if (e is AppException) rethrow;
-      throw NetworkException('Erreur lors de la récupération des matchs à venir TheSportsDB', null, e);
+      throw NetworkException(
+        'Erreur lors de la récupération des matchs à venir TheSportsDB',
+        null,
+        e,
+      );
     }
   }
 

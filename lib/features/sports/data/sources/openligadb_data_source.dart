@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
 
 import '../../domain/entities/sport.dart';
@@ -15,11 +16,9 @@ class OpenLigaDbDataSource implements SportsDataSource {
   final http.Client client;
   final String baseUrl;
 
-  OpenLigaDbDataSource({
-    http.Client? httpClient,
-    String? customBaseUrl,
-  }) : client = httpClient ?? http.Client(),
-       baseUrl = customBaseUrl ?? AppConfig.current.openLigaDbBaseUrl;
+  OpenLigaDbDataSource({http.Client? httpClient, String? customBaseUrl})
+    : client = httpClient ?? http.Client(),
+      baseUrl = customBaseUrl ?? AppConfig.current.openLigaDbBaseUrl;
 
   @override
   String get providerId => 'openligadb';
@@ -101,7 +100,8 @@ class OpenLigaDbDataSource implements SportsDataSource {
 
   String _resolveLeagueShortcut(String competitionId) {
     for (final entry in defaultLeagues.entries) {
-      if (entry.value['id'] == competitionId || entry.key == competitionId.toLowerCase()) {
+      if (entry.value['id'] == competitionId ||
+          entry.key == competitionId.toLowerCase()) {
         return entry.key;
       }
     }
@@ -141,7 +141,9 @@ class OpenLigaDbDataSource implements SportsDataSource {
   Future<List<CompetitionEntity>> fetchCompetitions({
     required String sportId,
   }) async {
-    final filtered = defaultLeagues.values.where((l) => l['sportId'] == sportId);
+    final filtered = defaultLeagues.values.where(
+      (l) => l['sportId'] == sportId,
+    );
     return filtered.map((l) {
       return CompetitionEntity(
         id: l['id']!,
@@ -166,7 +168,10 @@ class OpenLigaDbDataSource implements SportsDataSource {
       final response = await client.get(uri);
 
       if (response.statusCode != 200) {
-        throw NetworkException('Erreur OpenLigaDB: ${response.statusCode}', response.statusCode);
+        throw NetworkException(
+          'Erreur OpenLigaDB: ${response.statusCode}',
+          response.statusCode,
+        );
       }
 
       final list = jsonDecode(response.body) as List<dynamic>? ?? [];
@@ -186,7 +191,11 @@ class OpenLigaDbDataSource implements SportsDataSource {
       return matches;
     } catch (e) {
       if (e is AppException) rethrow;
-      throw NetworkException('Impossible de récupérer les matchs à venir OpenLigaDB', null, e);
+      throw NetworkException(
+        'Impossible de récupérer les matchs à venir OpenLigaDB',
+        null,
+        e,
+      );
     }
   }
 
@@ -198,7 +207,10 @@ class OpenLigaDbDataSource implements SportsDataSource {
       final response = await client.get(uri);
 
       if (response.statusCode != 200) {
-        throw NetworkException('Erreur OpenLigaDB: ${response.statusCode}', response.statusCode);
+        throw NetworkException(
+          'Erreur OpenLigaDB: ${response.statusCode}',
+          response.statusCode,
+        );
       }
 
       final list = jsonDecode(response.body) as List<dynamic>? ?? [];
@@ -216,7 +228,11 @@ class OpenLigaDbDataSource implements SportsDataSource {
 
         // Si non terminé et commencé depuis moins de 3 heures -> en direct
         if (!isFinished && diffHours >= 0 && diffHours <= 3) {
-          final m = _parseMatch(map, defaultLeagues[shortcut]!['id']!, MatchStatus.live);
+          final m = _parseMatch(
+            map,
+            defaultLeagues[shortcut]!['id']!,
+            MatchStatus.live,
+          );
           if (m != null) matches.add(m);
         }
       }
@@ -224,7 +240,11 @@ class OpenLigaDbDataSource implements SportsDataSource {
       return matches;
     } catch (e) {
       if (e is AppException) rethrow;
-      throw NetworkException('Impossible de récupérer les matchs en direct OpenLigaDB', null, e);
+      throw NetworkException(
+        'Impossible de récupérer les matchs en direct OpenLigaDB',
+        null,
+        e,
+      );
     }
   }
 
@@ -240,7 +260,10 @@ class OpenLigaDbDataSource implements SportsDataSource {
       final response = await client.get(uri);
 
       if (response.statusCode != 200) {
-        throw NetworkException('Erreur OpenLigaDB: ${response.statusCode}', response.statusCode);
+        throw NetworkException(
+          'Erreur OpenLigaDB: ${response.statusCode}',
+          response.statusCode,
+        );
       }
 
       final list = jsonDecode(response.body) as List<dynamic>? ?? [];
@@ -258,7 +281,11 @@ class OpenLigaDbDataSource implements SportsDataSource {
       return matches;
     } catch (e) {
       if (e is AppException) rethrow;
-      throw NetworkException('Impossible de récupérer l\'historique OpenLigaDB', null, e);
+      throw NetworkException(
+        'Impossible de récupérer l\'historique OpenLigaDB',
+        null,
+        e,
+      );
     }
   }
 
@@ -297,11 +324,16 @@ class OpenLigaDbDataSource implements SportsDataSource {
       final t2 = item['team2'] as Map<String, dynamic>? ?? {};
 
       final homeName = (t1['teamName'] as String?)?.trim() ?? 'Équipe Domicile';
-      final awayName = (t2['teamName'] as String?)?.trim() ?? 'Équipe Extérieur';
-      final homeId = 'team_${t1['teamId'] ?? homeName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}';
-      final awayId = 'team_${t2['teamId'] ?? awayName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}';
+      final awayName =
+          (t2['teamName'] as String?)?.trim() ?? 'Équipe Extérieur';
+      final homeId =
+          'team_${t1['teamId'] ?? homeName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}';
+      final awayId =
+          'team_${t2['teamId'] ?? awayName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}';
 
-      final kickoffStr = item['matchDateTimeUTC'] as String? ?? item['matchDateTime'] as String?;
+      final kickoffStr =
+          item['matchDateTimeUTC'] as String? ??
+          item['matchDateTime'] as String?;
       final utcKickoff = kickoffStr != null
           ? (DateTime.tryParse(kickoffStr)?.toUtc() ?? DateTime.now().toUtc())
           : DateTime.now().toUtc();

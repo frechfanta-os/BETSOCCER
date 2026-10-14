@@ -186,9 +186,13 @@ class SportsController extends ChangeNotifier {
 
   /// Matchs en direct filtrés (Live Center : UNIQUEMENT les rencontres en direct actif)
   List<MatchEntity> get filteredLiveMatches {
-    final liveOnly = _liveMatches.where((m) => m.status == MatchStatus.live).toList();
+    final liveOnly = _liveMatches
+        .where((m) => m.status == MatchStatus.live)
+        .toList();
     if (liveOnly.isEmpty) {
-      final inPlay = _allMatches.where((m) => m.status == MatchStatus.live).toList();
+      final inPlay = _allMatches
+          .where((m) => m.status == MatchStatus.live)
+          .toList();
       return _filterMatchesBySport(inPlay);
     }
     return _filterMatchesBySport(liveOnly);

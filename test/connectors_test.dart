@@ -16,7 +16,10 @@ void main() {
 
       test('is strictly disabled by policy', () {
         expect(melbet.isEnabled, isFalse);
-        expect(melbet.accessStatus, equals(ConnectorAccessStatus.disabledByPolicy));
+        expect(
+          melbet.accessStatus,
+          equals(ConnectorAccessStatus.disabledByPolicy),
+        );
         expect(melbet.lastError, contains('DISABLED_BY_POLICY'));
         expect(melbet.supportedDataTypes, isEmpty);
         expect(melbet.supportsSportsDiscovery, isFalse);
@@ -185,7 +188,10 @@ void main() {
       test('fetchSports returns Football, Handball, Volleyball', () async {
         final sports = await oldb.fetchSports();
         expect(sports.length, equals(3));
-        expect(sports.map((s) => s.code), containsAll(['SOCCER', 'HANDBALL', 'VOLLEYBALL']));
+        expect(
+          sports.map((s) => s.code),
+          containsAll(['SOCCER', 'HANDBALL', 'VOLLEYBALL']),
+        );
       });
 
       test('fetchUpcomingMatches parses upcoming matches correctly', () async {
@@ -203,11 +209,17 @@ void main() {
             }
           ]
           ''';
-          return http.Response(jsonResponse, 200, headers: {'content-type': 'application/json'});
+          return http.Response(
+            jsonResponse,
+            200,
+            headers: {'content-type': 'application/json'},
+          );
         });
 
         final source = OpenLigaDbDataSource(httpClient: mockClient);
-        final matches = await source.fetchUpcomingMatches(competitionId: 'comp_old_bl1');
+        final matches = await source.fetchUpcomingMatches(
+          competitionId: 'comp_old_bl1',
+        );
 
         expect(matches.length, equals(1));
         final m = matches.first;
@@ -220,7 +232,8 @@ void main() {
       test('fetchLiveMatches extracts live matches correctly', () async {
         final nowIso = DateTime.now().toUtc().toIso8601String();
         final mockClient = MockClient((request) async {
-          final jsonResponse = '''
+          final jsonResponse =
+              '''
           [
             {
               "matchID": 9902,
@@ -235,7 +248,11 @@ void main() {
             }
           ]
           ''';
-          return http.Response(jsonResponse, 200, headers: {'content-type': 'application/json'});
+          return http.Response(
+            jsonResponse,
+            200,
+            headers: {'content-type': 'application/json'},
+          );
         });
 
         final source = OpenLigaDbDataSource(httpClient: mockClient);
@@ -267,11 +284,17 @@ void main() {
             ]
           }
           ''';
-          return http.Response(jsonResponse, 200, headers: {'content-type': 'application/json'});
+          return http.Response(
+            jsonResponse,
+            200,
+            headers: {'content-type': 'application/json'},
+          );
         });
 
         final source = TheSportsDbDataSource(httpClient: mockClient);
-        final matches = await source.fetchUpcomingMatches(competitionId: 'comp_fduk_e0');
+        final matches = await source.fetchUpcomingMatches(
+          competitionId: 'comp_fduk_e0',
+        );
 
         expect(matches.length, equals(1));
         final m = matches.first;

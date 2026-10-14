@@ -1,6 +1,6 @@
 import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/http.dart' as http;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:betsoccer/core/database/app_database.dart';
@@ -27,7 +27,9 @@ void main() {
       final source = OpenLigaDbDataSource();
       List<MatchEntity> matches;
       try {
-        matches = await source.fetchUpcomingMatches(competitionId: 'comp_old_bl1');
+        matches = await source.fetchUpcomingMatches(
+          competitionId: 'comp_old_bl1',
+        );
       } catch (e) {
         // If network is completely unreachable in a sandboxed CI, skip
         markTestSkipped('Network call failed: $e');
@@ -62,23 +64,28 @@ void main() {
       }
     });
 
-    test('TheSportsDB public API returns real upcoming events for Premier League', () async {
-      final source = TheSportsDbDataSource();
-      List<MatchEntity> matches;
-      try {
-        matches = await source.fetchUpcomingMatches(competitionId: 'comp_fduk_e0');
-      } catch (e) {
-        markTestSkipped('Network call failed: $e');
-        return;
-      }
+    test(
+      'TheSportsDB public API returns real upcoming events for Premier League',
+      () async {
+        final source = TheSportsDbDataSource();
+        List<MatchEntity> matches;
+        try {
+          matches = await source.fetchUpcomingMatches(
+            competitionId: 'comp_fduk_e0',
+          );
+        } catch (e) {
+          markTestSkipped('Network call failed: $e');
+          return;
+        }
 
-      expect(matches, isNotEmpty);
-      final first = matches.first;
-      expect(first.homeTeamName, isNotEmpty);
-      expect(first.awayTeamName, isNotEmpty);
-      expect(first.status, equals(MatchStatus.upcoming));
-      expect(first.sourceProvider, equals('thesportsdb'));
-    });
+        expect(matches, isNotEmpty);
+        final first = matches.first;
+        expect(first.homeTeamName, isNotEmpty);
+        expect(first.awayTeamName, isNotEmpty);
+        expect(first.status, equals(MatchStatus.upcoming));
+        expect(first.sourceProvider, equals('thesportsdb'));
+      },
+    );
 
     test('End-to-End: Real API -> SportsRepository -> SQLite Persistence -> SportsController', () async {
       final db = AppDatabase();
@@ -103,7 +110,9 @@ void main() {
 
       // 2. Vérifier que les matchs en direct ne contiennent AUCUN faux match historique
       expect(
-        controller.filteredLiveMatches.every((m) => m.status == MatchStatus.live),
+        controller.filteredLiveMatches.every(
+          (m) => m.status == MatchStatus.live,
+        ),
         isTrue,
         reason: 'Live Center must never contain non-live matches!',
       );
@@ -124,7 +133,9 @@ void main() {
         await controller.loadInitialData();
         expect(controller.filteredUpcomingMatches, isNotEmpty);
         expect(
-          controller.filteredUpcomingMatches.every((m) => m.status == MatchStatus.upcoming),
+          controller.filteredUpcomingMatches.every(
+            (m) => m.status == MatchStatus.upcoming,
+          ),
           isTrue,
         );
       }

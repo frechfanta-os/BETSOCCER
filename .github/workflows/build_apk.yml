@@ -47,6 +47,15 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
+      - name: Verify Code Formatting
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Static Code Analysis
+        run: flutter analyze
+
+      - name: Run Automated Tests
+        run: flutter test
+
       - name: Build Android Release APK
         run: |
           flutter build apk --release \
@@ -84,16 +93,41 @@ jobs:
           echo "PRIMARY_SHA256=$PRIMARY_SHA256" >> $GITHUB_ENV
           cd ..
 
+      - name: Upload APK Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BETSOCCER-Android-APK
+          path: |
+            release-artifacts/app-release.apk
+            release-artifacts/BETSOCCER-v${{ env.PUBSPEC_VERSION_NAME }}.apk
+            release-artifacts/app-release.apk.sha256
+          if-no-files-found: error
+
       - name: Generate Release Notes
         run: |
           cat << 'EOF' > RELEASE_NOTES.md
-          ### BETSOCCER v${{ env.PUBSPEC_VERSION_NAME }} (${{ env.PUBSPEC_VERSION_CODE }})
+          ## BETSOCCER v${{ env.PUBSPEC_VERSION_NAME }} (Build ${{ env.PUBSPEC_VERSION_CODE }})
 
-          Mise à jour de l'application BETSOCCER — Multisport Analytics AI.
-          Package ID: `com.ghdinteractivestudio.betsoccer`
+          Première release officielle de **BETSOCCER** — Plateforme d'analyse et de suivi multisport avec IA.
 
-          #### Intégrité des Artefacts
-          - **SHA-256**: `${{ env.PRIMARY_SHA256 }}`
+          ### Fonctionnalités Clés
+          - **Matchs en Direct & Prochaines Rencontres** : Suivi des scores en direct et calendrier des fixtures avec filtrage strict par statut (`live` et `upcoming`).
+          - **Connecteurs d'API Réelles** :
+            - **OpenLigaDB** : Intégration en temps réel des matchs et résultats (Bundesliga, championnats européens).
+            - **TheSportsDB** : Calendrier des prochaines fixtures (Premier League, La Liga, Serie A, etc.).
+          - **Stockage Local SQLite Robuste** : Schéma relationnel complet (10 tables) assurant la persistance et le fonctionnement hors-ligne.
+          - **Résultats Historiques & Statistiques** : Base de données de plus de 2 400 matchs historiques pour l'analyse prédictive et les métriques de performance.
+          - **Architecture & Fiabilité** : Synchronisation réseau avec résilience, cache HTTP et isolation des erreurs.
+          - **Politique Éthique & Données** : Respect strict du *zero-odds policy*. Le connecteur MelBet est audité et désactivé par politique (`DISABLED_BY_POLICY` / `RESTRICTED_BY_ROBOTS_TXT`).
+
+          ### Intégrité des Fichiers & Sécurité
+          - **Application ID** : `com.ghdinteractivestudio.betsoccer`
+          - **SHA-256** : `${{ env.PRIMARY_SHA256 }}`
+
+          ### Instructions d'Installation
+          1. Télécharger `BETSOCCER-v${{ env.PUBSPEC_VERSION_NAME }}.apk` ou `app-release.apk`.
+          2. Autoriser l'installation d'applications issues de sources inconnues si demandé sur votre appareil Android.
+          3. Vérifier l'empreinte SHA-256 avec `sha256sum app-release.apk` avant installation.
           EOF
 
       - name: Publish GitHub Release
