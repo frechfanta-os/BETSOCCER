@@ -156,6 +156,7 @@ void main() {
       );
       await tester.pump();
       expect(find.text('Stats & Analytics'), findsOneWidget);
+      expect(find.text('Profondeur Historique & Échantillons'), findsOneWidget);
 
       // 5. Navigation vers l'onglet More (Settings)
       await tester.tap(
@@ -163,8 +164,14 @@ void main() {
       );
       await tester.pump();
       expect(find.text('Settings'), findsOneWidget);
+      expect(find.text('Sync & Refresh Local SQLite'), findsOneWidget);
 
-      // 6. Test du basculement du mode sombre / clair
+      // 6. Test du déclenchement manuel de synchronisation et SnackBar
+      await tester.tap(find.text('Sync & Refresh Local SQLite'));
+      await tester.pump();
+      expect(find.byType(SnackBar), findsOneWidget);
+
+      // 7. Test du basculement du mode sombre / clair
       expect(controller.isDarkMode, isTrue);
       controller.toggleTheme();
       await tester.pump();

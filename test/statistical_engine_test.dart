@@ -549,6 +549,111 @@ void main() {
         expect(zeroLower, equals(0.0));
         expect(zeroUpper, equals(0.0));
       });
+
+      test('BacktestEvaluator strictly enforces zero-lookahead on simultaneous matches', () {
+        // Série synthétique avec deux matchs simultanés au jour 5
+        final series = [
+          makeMatch(
+            id: 's1',
+            sportId: 'sport_football',
+            homeTeamId: 't1',
+            homeTeamName: 'T1',
+            awayTeamId: 't2',
+            awayTeamName: 'T2',
+            kickoff: baseTime,
+            homeScore: 2,
+            awayScore: 0,
+          ),
+          makeMatch(
+            id: 's2',
+            sportId: 'sport_football',
+            homeTeamId: 't3',
+            homeTeamName: 'T3',
+            awayTeamId: 't4',
+            awayTeamName: 'T4',
+            kickoff: baseTime.add(const Duration(days: 1)),
+            homeScore: 1,
+            awayScore: 1,
+          ),
+          makeMatch(
+            id: 's3',
+            sportId: 'sport_football',
+            homeTeamId: 't1',
+            homeTeamName: 'T1',
+            awayTeamId: 't3',
+            awayTeamName: 'T3',
+            kickoff: baseTime.add(const Duration(days: 2)),
+            homeScore: 0,
+            awayScore: 1,
+          ),
+          makeMatch(
+            id: 's4',
+            sportId: 'sport_football',
+            homeTeamId: 't2',
+            homeTeamName: 'T2',
+            awayTeamId: 't4',
+            awayTeamName: 'T4',
+            kickoff: baseTime.add(const Duration(days: 3)),
+            homeScore: 3,
+            awayScore: 2,
+          ),
+          // Jour 5 : deux matchs au même instant exact
+          makeMatch(
+            id: 'sim_a',
+            sportId: 'sport_football',
+            homeTeamId: 't1',
+            homeTeamName: 'T1',
+            awayTeamId: 't4',
+            awayTeamName: 'T4',
+            kickoff: baseTime.add(const Duration(days: 5)),
+            homeScore: 1,
+            awayScore: 0,
+          ),
+          makeMatch(
+            id: 'sim_b',
+            sportId: 'sport_football',
+            homeTeamId: 't2',
+            homeTeamName: 'T2',
+            awayTeamId: 't3',
+            awayTeamName: 'T3',
+            kickoff: baseTime.add(const Duration(days: 5)),
+            homeScore: 0,
+            awayScore: 2,
+          ),
+        ];
+
+        final historySeenBySimA = <String>[];
+        final historySeenBySimB = <String>[];
+
+        final metrics = BacktestEvaluator.evaluateModel(
+          modelName: 'AuditModel',
+          matches: series,
+          minHistoryBeforeEvaluation: 1,
+          predictFn: (target, historyBefore) {
+            if (target.id == 'sim_a') {
+              historySeenBySimA.addAll(historyBefore.map((m) => m.id));
+            } else if (target.id == 'sim_b') {
+              historySeenBySimB.addAll(historyBefore.map((m) => m.id));
+            }
+            return const PoissonDixonColesModel().predictMatch(
+              match: target,
+              historicalMatches: historyBefore,
+            );
+          },
+        );
+
+        // Aucun match simultané ne doit voir l'autre dans son historique
+        expect(historySeenBySimA.contains('sim_b'), isFalse);
+        expect(historySeenBySimB.contains('sim_a'), isFalse);
+        expect(historySeenBySimA.contains('sim_a'), isFalse);
+        expect(historySeenBySimB.contains('sim_b'), isFalse);
+        expect(historySeenBySimA, containsAll(['s1', 's2', 's3', 's4']));
+        expect(historySeenBySimB, containsAll(['s1', 's2', 's3', 's4']));
+
+        // Vérification de la calibration ECE
+        expect(metrics.expectedCalibrationError.isNaN, isFalse);
+        expect(metrics.calibrationBins.length, equals(5));
+      });
     });
   });
 }
