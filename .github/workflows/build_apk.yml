@@ -56,7 +56,8 @@ jobs:
         run: |
           flutter build apk --release \
             --build-name="${{ env.PUBSPEC_VERSION_NAME }}" \
-            --build-number="${{ env.PUBSPEC_VERSION_CODE }}"
+            --build-number="${{ env.PUBSPEC_VERSION_CODE }}" \
+            --verbose
 
       - name: Validate APK Internal Metadata & Package ID
         run: |
