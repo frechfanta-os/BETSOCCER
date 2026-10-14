@@ -62,7 +62,7 @@ class CollectorConfig:
     # Football-Data.co.uk URLs & Historical Archives
     footballdata_fixtures_url: str = "https://football-data.co.uk/fixtures.csv"
     footballdata_historical_seasons: List[str] = field(default_factory=lambda: ["2324"])
-    footballdata_historical_leagues: List[str] = field(default_factory=lambda: ["E0", "SP1"])
+    footballdata_historical_leagues: List[str] = field(default_factory=lambda: ["E0", "SP1", "I1", "F1"])
     
     # TheSportsDB URLs (Free V1 API key 3)
     thesportsdb_base_url: str = "https://www.thesportsdb.com/api/v1/json/3"

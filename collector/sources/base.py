@@ -1,16 +1,20 @@
 """
 Base class for sources using Crawl4AI.
-Provides error handling, automatic retries with exponential backoff, and rate limiting.
+Provides error handling, automatic retries with exponential backoff, rate limiting,
+and HTTP conditional request caching (ETag / If-Modified-Since).
 """
 
 import asyncio
 import logging
+import urllib.request
+import urllib.error
 from abc import ABC, abstractmethod
 from typing import List, Tuple, Optional, Any
 from datetime import datetime, timezone
 
 from crawl4ai import AsyncWebCrawler
 
+from ..cache import HttpCacheManager
 from ..models import (
     NormalizedSport,
     NormalizedCompetition,
@@ -30,12 +34,14 @@ class BaseSource(ABC):
         max_retries: int = 3,
         backoff_factor: float = 1.5,
         rate_limit_delay: float = 1.0,
+        cache_manager: Optional[HttpCacheManager] = None,
     ):
         self.provider_id = provider_id
         self.display_name = display_name
         self.max_retries = max_retries
         self.backoff_factor = backoff_factor
         self.rate_limit_delay = rate_limit_delay
+        self.cache_manager = cache_manager or HttpCacheManager()
 
     @abstractmethod
     async def collect(
@@ -57,8 +63,8 @@ class BaseSource(ABC):
         self, crawler: AsyncWebCrawler, url: str
     ) -> str:
         """
-        Fetches a target URL using Crawl4AI with automatic retry and exponential backoff.
-        Gracefully handles file downloads (like .csv or raw binary feeds) via streaming HTTP request.
+        Fetches a target URL using Crawl4AI or HTTP streaming with automatic retry,
+        exponential backoff, and HTTP 304 conditional request caching.
         """
         last_exception = None
         delay = self.rate_limit_delay
@@ -67,19 +73,33 @@ class BaseSource(ABC):
             try:
                 logger.info(f"[{self.provider_id}] Fetching (attempt {attempt}/{self.max_retries}): {url}")
 
-                # If target is a direct raw data file (CSV, TSV, GZ), use fast non-browser HTTP fetch
-                if url.endswith(".csv") or url.endswith(".tsv"):
-                    import urllib.request
-                    req = urllib.request.Request(
-                        url,
-                        headers={"User-Agent": "BETSOCCER-Collector/1.0 (+https://github.com/frechfanta-os/BETSOCCER)"}
-                    )
-                    with urllib.request.urlopen(req, timeout=30) as resp:
-                        raw_bytes = resp.read()
-                        content = raw_bytes.decode("utf-8-sig", errors="replace")
-                        if self.rate_limit_delay > 0:
-                            await asyncio.sleep(self.rate_limit_delay)
-                        return content
+                # If target is a direct raw data file (CSV, TSV, GZ, JSON), use fast non-browser HTTP fetch with caching
+                if url.endswith(".csv") or url.endswith(".tsv") or "/api/" in url or url.endswith(".json"):
+                    headers = {
+                        "User-Agent": "BETSOCCER-Collector/1.0 (+https://github.com/frechfanta-os/BETSOCCER)"
+                    }
+                    headers.update(self.cache_manager.get_conditional_headers(url))
+                    req = urllib.request.Request(url, headers=headers)
+
+                    try:
+                        with urllib.request.urlopen(req, timeout=30) as resp:
+                            etag = resp.headers.get("ETag")
+                            last_mod = resp.headers.get("Last-Modified")
+                            raw_bytes = resp.read()
+                            content = raw_bytes.decode("utf-8-sig", errors="replace")
+                            self.cache_manager.store_response(url, content, etag=etag, last_modified=last_mod)
+                            if self.rate_limit_delay > 0:
+                                await asyncio.sleep(self.rate_limit_delay)
+                            return content
+                    except urllib.error.HTTPError as he:
+                        if he.code == 304:
+                            logger.info(f"[{self.provider_id}] HTTP 304 Not Modified for {url}, using cached content")
+                            cached = self.cache_manager.get_cached_content(url)
+                            if cached is not None:
+                                if self.rate_limit_delay > 0:
+                                    await asyncio.sleep(self.rate_limit_delay)
+                                return cached
+                        raise
 
                 result = await crawler.arun(url=url)
 
@@ -92,7 +112,6 @@ class BaseSource(ABC):
                     error_msg = result.error_message if result else "Empty result"
                     # If error is a download trigger, fallback to direct streaming
                     if "Download is starting" in str(error_msg):
-                        import urllib.request
                         req = urllib.request.Request(
                             url,
                             headers={"User-Agent": "BETSOCCER-Collector/1.0 (+https://github.com/frechfanta-os/BETSOCCER)"}

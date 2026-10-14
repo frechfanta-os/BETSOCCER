@@ -444,5 +444,145 @@ class TestSourceParsers(unittest.TestCase):
         self.assertEqual(stats_by_name["referee_assigned"].raw_unit, "C Pawson")
 
 
+class TestDataValidator(unittest.TestCase):
+    def setUp(self):
+        from collector.validator import DataValidator
+        self.validator = DataValidator
+
+    def _make_valid_match(self):
+        return NormalizedMatch(
+            id="test_m1",
+            sport_id="sport_football",
+            competition_id="comp_pl",
+            home_team_id="team_ars",
+            home_team_name="Arsenal",
+            away_team_id="team_che",
+            away_team_name="Chelsea",
+            utc_kickoff="2026-10-18T15:00:00Z",
+            status="finished",
+            source_provider="test",
+            result=NormalizedResult(
+                id="res_m1",
+                match_id="test_m1",
+                home_score=2,
+                away_score=1,
+                home_halftime_score=1,
+                away_halftime_score=0,
+            ),
+        )
+
+    def test_valid_match_passes_validation(self):
+        m = self._make_valid_match()
+        valid, reason = self.validator.validate_match(m)
+        self.assertTrue(valid)
+        self.assertIsNone(reason)
+
+    def test_empty_required_fields_rejected(self):
+        m = self._make_valid_match()
+        m.home_team_name = "   "
+        valid, reason = self.validator.validate_match(m)
+        self.assertFalse(valid)
+        self.assertIn("empty home_team_name", reason)
+
+    def test_identical_teams_rejected(self):
+        m = self._make_valid_match()
+        m.away_team_name = "Arsenal"
+        valid, reason = self.validator.validate_match(m)
+        self.assertFalse(valid)
+        self.assertIn("identical home and away teams", reason)
+
+    def test_invalid_status_rejected(self):
+        m = self._make_valid_match()
+        m.status = "invalid_status_xyz"
+        valid, reason = self.validator.validate_match(m)
+        self.assertFalse(valid)
+        self.assertIn("invalid status", reason)
+
+    def test_negative_score_rejected(self):
+        m = self._make_valid_match()
+        m.result.home_score = -1
+        valid, reason = self.validator.validate_match(m)
+        self.assertFalse(valid)
+        self.assertIn("negative home score", reason)
+
+    def test_halftime_score_greater_than_fulltime_rejected(self):
+        m = self._make_valid_match()
+        m.result.home_score = 1
+        m.result.home_halftime_score = 2  # Impossible in football
+        valid, reason = self.validator.validate_match(m)
+        self.assertFalse(valid)
+        self.assertIn("home halftime (2) > fulltime (1)", reason)
+
+    def test_invalid_kickoff_rejected(self):
+        m = self._make_valid_match()
+        m.utc_kickoff = "not-a-date"
+        valid, reason = self.validator.validate_match(m)
+        self.assertFalse(valid)
+        self.assertIn("Invalid ISO-8601", reason)
+
+
+class TestHttpCacheManager(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.cache_file = os.path.join(self.temp_dir.name, "test_cache.json")
+        from collector.cache import HttpCacheManager
+        self.cache = HttpCacheManager(cache_file=self.cache_file)
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def test_cache_store_and_retrieve(self):
+        url = "https://example.com/data.csv"
+        self.cache.store_response(url, "a,b,c\n1,2,3", etag='"12345"', last_modified="Mon, 12 Oct 2026 10:00:00 GMT")
+        
+        # Check retrieval
+        content = self.cache.get_cached_content(url)
+        self.assertEqual(content, "a,b,c\n1,2,3")
+
+        # Check headers
+        headers = self.cache.get_conditional_headers(url)
+        self.assertEqual(headers.get("If-None-Match"), '"12345"')
+        self.assertEqual(headers.get("If-Modified-Since"), "Mon, 12 Oct 2026 10:00:00 GMT")
+
+
+class TestDatabaseManagerPhase4(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.db_path = os.path.join(self.temp_dir.name, "test_p4.db")
+        self.db = DatabaseManager(db_path=self.db_path)
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def test_sync_logs_table_and_persistence(self):
+        report = SyncReport(
+            provider_id="football_data_co_uk",
+            key="sync_test_key",
+            status="SUCCESS",
+            records_synced=100,
+            started_at=datetime(2026, 10, 14, 8, 0, 0, tzinfo=timezone.utc),
+            finished_at=datetime(2026, 10, 14, 8, 0, 5, tzinfo=timezone.utc),
+            duration_ms=5000,
+            details={"leagues": ["E0", "SP1"]},
+        )
+        self.db.record_sync_state(report)
+        logs = self.db.get_sync_logs(limit=10)
+        self.assertEqual(len(logs), 1)
+        self.assertEqual(logs[0]["provider_id"], "football_data_co_uk")
+        self.assertEqual(logs[0]["records_synced"], 100)
+        self.assertEqual(logs[0]["duration_ms"], 5000)
+
+    def test_serie_a_and_ligue_1_mappings(self):
+        from collector.sources.footballdata_historical_source import HISTORICAL_LEAGUE_MAP
+        self.assertIn("I1", HISTORICAL_LEAGUE_MAP)
+        self.assertEqual(HISTORICAL_LEAGUE_MAP["I1"]["name"], "Serie A")
+        self.assertEqual(HISTORICAL_LEAGUE_MAP["I1"]["country"], "Italy")
+
+        self.assertIn("F1", HISTORICAL_LEAGUE_MAP)
+        self.assertEqual(HISTORICAL_LEAGUE_MAP["F1"]["name"], "Ligue 1")
+        self.assertEqual(HISTORICAL_LEAGUE_MAP["F1"]["country"], "France")
+
+
 if __name__ == "__main__":
     unittest.main()
+

@@ -116,8 +116,8 @@ class AutonomousCollector:
                 except Exception as e:
                     logger.error(f"✗ [{src_name}] Unhandled collection failure: {e}", exc_info=True)
                     failed_report = SyncReport(
-                        provider_id=src_name,
-                        key=f"sync_{src_name}_{cycle_start.strftime('%Y%m%d_%H%M%S')}",
+                        provider_id=source.provider_id,
+                        key=f"sync_{source.provider_id}_{src_name}_{cycle_start.strftime('%Y%m%d_%H%M%S')}",
                         status="ERROR",
                         records_synced=0,
                         started_at=cycle_start,

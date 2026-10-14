@@ -81,6 +81,9 @@ class FakeSportsRepository implements SportsRepository {
 
   @override
   Future<List<Map<String, dynamic>>> getAllSyncStates() async => [];
+
+  @override
+  Future<List<Map<String, dynamic>>> getSyncLogs({int limit = 20}) async => [];
 }
 
 class FakeFirebaseSyncAdapter extends FirebaseSyncAdapter {

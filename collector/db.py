@@ -4,6 +4,7 @@ Guarantees 100% schema compatibility with BETSOCCER Flutter app (V1InitialSchema
 """
 
 import sqlite3
+import json
 import logging
 from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any, Tuple
@@ -18,6 +19,7 @@ from .models import (
     NormalizedStatistic,
     SyncReport,
 )
+from .validator import DataValidator
 
 logger = logging.getLogger("betsoccer.collector.db")
 
@@ -197,6 +199,23 @@ class DatabaseManager:
                 );
             """)
 
+            # 11. sync_logs
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS sync_logs (
+                    id TEXT PRIMARY KEY,
+                    provider_id TEXT NOT NULL REFERENCES data_sources(provider_id),
+                    status TEXT NOT NULL,
+                    records_synced INTEGER NOT NULL DEFAULT 0,
+                    duration_ms INTEGER NOT NULL DEFAULT 0,
+                    started_at TEXT NOT NULL,
+                    finished_at TEXT NOT NULL,
+                    error_message TEXT,
+                    details_json TEXT
+                );
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_sync_logs_provider ON sync_logs (provider_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_sync_logs_started ON sync_logs (started_at);")
+
             # Default Sources registration
             now_iso = datetime.now(timezone.utc).isoformat()
             default_sources = [
@@ -319,16 +338,29 @@ class DatabaseManager:
     def save_matches_batch(self, matches: List[NormalizedMatch]) -> int:
         """
         Idempotent transactional batch save for matches, results and statistics.
-        Detects duplicates and preserves existing data.
+        Validates data before insertion, detects duplicates, rolls back atomically on failure,
+        and preserves existing data.
         """
         if not matches:
+            return 0
+
+        valid_matches, rejected = DataValidator.filter_and_sanitize(matches)
+        if rejected:
+            logger.warning(
+                f"DataValidator rejected {len(rejected)} match records: "
+                f"{[r[1] for r in rejected[:3]]}"
+            )
+        if not valid_matches:
             return 0
 
         now_iso = datetime.now(timezone.utc).isoformat()
         saved_count = 0
 
-        with self.get_connection() as conn:
-            for m in matches:
+        conn = self.get_connection()
+        try:
+            conn.isolation_level = None
+            conn.execute("BEGIN IMMEDIATE TRANSACTION;")
+            for m in valid_matches:
                 # 1. Resolve canonical teams first to satisfy FK
                 resolved_home_id = self._resolve_team_id(
                     conn, m.sport_id, m.home_team_id, m.home_team_name, m.source_provider, now_iso
@@ -337,34 +369,51 @@ class DatabaseManager:
                     conn, m.sport_id, m.away_team_id, m.away_team_name, m.source_provider, now_iso
                 )
 
-                # 2. Upsert match with unique composite constraint
-                cursor = conn.execute("""
-                    INSERT INTO matches (
-                        id, sport_id, competition_id, season_id, home_team_id, away_team_id,
-                        utc_kickoff, status, matchday, round_label, current_minute,
-                        is_sample_data, source_provider, source_match_id, last_synced_at, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(competition_id, home_team_id, away_team_id, utc_kickoff) DO UPDATE SET
-                        status = excluded.status,
-                        matchday = coalesce(excluded.matchday, matches.matchday),
-                        round_label = coalesce(excluded.round_label, matches.round_label),
-                        current_minute = excluded.current_minute,
-                        last_synced_at = excluded.last_synced_at,
-                        source_provider = excluded.source_provider;
-                """, (
-                    m.id, m.sport_id, m.competition_id, m.season_id, resolved_home_id, resolved_away_id,
-                    m.utc_kickoff, m.status, m.matchday, m.round_label, m.current_minute,
-                    1 if m.is_sample_data else 0, m.source_provider, m.source_match_id,
-                    now_iso, now_iso
-                ))
-                saved_count += 1
+                # 2. Check if match already exists by ID or by composite natural key
+                iso_z = m.utc_kickoff if m.utc_kickoff.endswith("Z") else f"{m.utc_kickoff}Z"
+                iso_offset = m.utc_kickoff.replace("Z", "+00:00")
 
-                # Find actual match id in case of update
-                row = conn.execute("""
+                existing_row = conn.execute("""
                     SELECT id FROM matches 
-                    WHERE competition_id = ? AND home_team_id = ? AND away_team_id = ? AND utc_kickoff = ?;
-                """, (m.competition_id, resolved_home_id, resolved_away_id, m.utc_kickoff)).fetchone()
-                actual_match_id = row["id"] if row else m.id
+                    WHERE id = ? 
+                       OR (competition_id = ? AND home_team_id = ? AND away_team_id = ? 
+                           AND (utc_kickoff = ? OR utc_kickoff = ? OR utc_kickoff = ?));
+                """, (
+                    m.id,
+                    m.competition_id, resolved_home_id, resolved_away_id,
+                    m.utc_kickoff, iso_z, iso_offset
+                )).fetchone()
+
+                if existing_row:
+                    actual_match_id = existing_row["id"]
+                    conn.execute("""
+                        UPDATE matches SET
+                            status = ?,
+                            matchday = coalesce(?, matchday),
+                            round_label = coalesce(?, round_label),
+                            current_minute = ?,
+                            last_synced_at = ?,
+                            source_provider = ?
+                        WHERE id = ?;
+                    """, (
+                        m.status, m.matchday, m.round_label, m.current_minute,
+                        now_iso, m.source_provider, actual_match_id
+                    ))
+                else:
+                    actual_match_id = m.id
+                    conn.execute("""
+                        INSERT INTO matches (
+                            id, sport_id, competition_id, season_id, home_team_id, away_team_id,
+                            utc_kickoff, status, matchday, round_label, current_minute,
+                            is_sample_data, source_provider, source_match_id, last_synced_at, created_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                    """, (
+                        m.id, m.sport_id, m.competition_id, m.season_id, resolved_home_id, resolved_away_id,
+                        m.utc_kickoff, m.status, m.matchday, m.round_label, m.current_minute,
+                        1 if m.is_sample_data else 0, m.source_provider, m.source_match_id,
+                        now_iso, now_iso
+                    ))
+                saved_count += 1
 
                 # 3. Upsert result if available
                 if m.result:
@@ -415,10 +464,18 @@ class DatabaseManager:
                         stat.metric_name, stat.home_value, stat.away_value, stat.raw_unit, now_iso
                     ))
 
+            conn.execute("COMMIT;")
+        except Exception as e:
+            conn.execute("ROLLBACK;")
+            logger.error(f"Transaction aborted and rolled back during save_matches_batch: {e}")
+            raise
+        finally:
+            conn.close()
+
         return saved_count
 
     def record_sync_state(self, report: SyncReport) -> None:
-        """Records synchronization run in sync_state table."""
+        """Records synchronization run in sync_state and sync_logs tables."""
         now_iso = report.finished_at.isoformat()
         with self.get_connection() as conn:
             conn.execute("""
@@ -430,6 +487,33 @@ class DatabaseManager:
                     status = excluded.status,
                     error_message = excluded.error_message;
             """, (report.key, report.provider_id, now_iso, report.records_synced, report.status, report.error_message))
+
+            details_str = json.dumps(report.details) if report.details else None
+            log_id = f"log_{report.provider_id}_{int(report.started_at.timestamp())}_{report.duration_ms}"
+            conn.execute("""
+                INSERT OR REPLACE INTO sync_logs (
+                    id, provider_id, status, records_synced, duration_ms, started_at, finished_at, error_message, details_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """, (
+                log_id,
+                report.provider_id,
+                report.status,
+                report.records_synced,
+                report.duration_ms,
+                report.started_at.isoformat(),
+                now_iso,
+                report.error_message,
+                details_str,
+            ))
+
+    def get_sync_logs(self, limit: int = 20) -> List[Dict[str, Any]]:
+        """Returns recent sync log entries for local observability."""
+        with self.get_connection() as conn:
+            rows = conn.execute(
+                "SELECT * FROM sync_logs ORDER BY started_at DESC LIMIT ?;",
+                (limit,),
+            ).fetchall()
+            return [dict(r) for r in rows]
 
     def get_summary_stats(self) -> Dict[str, Any]:
         """Returns statistics of records currently in SQLite."""

@@ -4,6 +4,7 @@
 *.pyc
 __pycache__/
 .pytest_cache/
+.http_cache.json
 .venv/
 venv/
 *.db

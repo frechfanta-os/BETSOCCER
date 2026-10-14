@@ -48,6 +48,9 @@ class SportsController extends ChangeNotifier {
   List<Map<String, dynamic>> _syncStates = [];
   List<Map<String, dynamic>> get syncStates => _syncStates;
 
+  List<Map<String, dynamic>> _syncLogs = [];
+  List<Map<String, dynamic>> get syncLogs => _syncLogs;
+
   // Filtre de sport actif : 'All', 'Football', 'Basketball', 'Tennis', 'Handball', 'Volleyball'
   String _selectedSportFilter = 'All';
   String get selectedSportFilter => _selectedSportFilter;
@@ -106,6 +109,7 @@ class SportsController extends ChangeNotifier {
       _allMatches = await repository.getAllMatches();
       _dataSources = await repository.getDataSources();
       _syncStates = await repository.getAllSyncStates();
+      _syncLogs = await repository.getSyncLogs();
 
       if (_sports.isNotEmpty) {
         _selectedSport = _sports.first;

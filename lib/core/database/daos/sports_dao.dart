@@ -387,4 +387,16 @@ class SportsDao {
   Future<List<Map<String, dynamic>>> getAllSyncStates() async {
     return _db.query('sync_state', orderBy: 'last_synced_at DESC');
   }
+
+  Future<List<Map<String, dynamic>>> getSyncLogs({int limit = 20}) async {
+    try {
+      return await _db.query(
+        'sync_logs',
+        orderBy: 'started_at DESC',
+        limit: limit,
+      );
+    } catch (_) {
+      return [];
+    }
+  }
 }

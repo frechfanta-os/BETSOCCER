@@ -306,4 +306,9 @@ class SportsRepository {
   Future<List<Map<String, dynamic>>> getAllSyncStates() async {
     return sportsDao.getAllSyncStates();
   }
+
+  /// Récupère les journaux détaillés de synchronisation (observabilité locale)
+  Future<List<Map<String, dynamic>>> getSyncLogs({int limit = 20}) async {
+    return sportsDao.getSyncLogs(limit: limit);
+  }
 }

@@ -51,6 +51,22 @@ HISTORICAL_LEAGUE_MAP = {
         "country_code": "ES",
         "tier": 1,
     },
+    "I1": {
+        "comp_id": "comp_fduk_i1",
+        "name": "Serie A",
+        "code": "SA",
+        "country": "Italy",
+        "country_code": "IT",
+        "tier": 1,
+    },
+    "F1": {
+        "comp_id": "comp_fduk_f1",
+        "name": "Ligue 1",
+        "code": "L1",
+        "country": "France",
+        "country_code": "FR",
+        "tier": 1,
+    },
 }
 
 
@@ -70,8 +86,8 @@ class FootballDataHistoricalSource(BaseSource):
         )
         # Default: 2023-2024 season code '2324'
         self.seasons = seasons or ["2324"]
-        # Default: Premier League ('E0') and Bundesliga ('D1')
-        self.leagues = leagues or ["E0", "D1"]
+        # Default: Premier League ('E0'), La Liga ('SP1'), Serie A ('I1'), Ligue 1 ('F1')
+        self.leagues = leagues or ["E0", "SP1", "I1", "F1"]
 
     async def collect(
         self, crawler: AsyncWebCrawler
