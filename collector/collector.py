@@ -16,6 +16,7 @@ from .models import SyncReport
 from .sources.base import BaseSource
 from .sources.openligadb_source import OpenLigaDbSource
 from .sources.footballdata_fixtures_source import FootballDataFixturesSource
+from .sources.footballdata_historical_source import FootballDataHistoricalSource
 from .sources.thesportsdb_source import TheSportsDbSource
 
 logger = logging.getLogger("betsoccer.collector")
@@ -32,6 +33,7 @@ class AutonomousCollector:
         if "openligadb" in self.config.enabled_sources:
             self.sources["openligadb"] = OpenLigaDbSource(
                 leagues_config=self.config.openligadb_leagues,
+                historical_seasons=self.config.openligadb_historical_seasons,
                 max_retries=self.config.max_retries,
                 rate_limit_delay=self.config.rate_limit_delay_seconds,
             )
@@ -39,6 +41,14 @@ class AutonomousCollector:
         if "footballdata_fixtures" in self.config.enabled_sources:
             self.sources["footballdata_fixtures"] = FootballDataFixturesSource(
                 fixtures_url=self.config.footballdata_fixtures_url,
+                max_retries=self.config.max_retries,
+                rate_limit_delay=self.config.rate_limit_delay_seconds,
+            )
+
+        if "footballdata_historical" in self.config.enabled_sources:
+            self.sources["footballdata_historical"] = FootballDataHistoricalSource(
+                seasons=self.config.footballdata_historical_seasons,
+                leagues=self.config.footballdata_historical_leagues,
                 max_retries=self.config.max_retries,
                 rate_limit_delay=self.config.rate_limit_delay_seconds,
             )

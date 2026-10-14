@@ -31,6 +31,7 @@ class OpenLigaDbSource(BaseSource):
     def __init__(
         self,
         leagues_config: Optional[Dict[str, Dict[str, str]]] = None,
+        historical_seasons: Optional[List[int]] = None,
         max_retries: int = 3,
         rate_limit_delay: float = 1.0,
     ):
@@ -46,6 +47,7 @@ class OpenLigaDbSource(BaseSource):
             "hbl": {"sport": "handball", "name": "Handball Bundesliga (HBL)", "code": "HBL", "country": "Allemagne"},
             "vblf1": {"sport": "volleyball", "name": "1. Volleyball Bundesliga Frauen", "code": "VBLF1", "country": "Allemagne"},
         }
+        self.historical_seasons = historical_seasons or []
 
     def _extract_json(self, raw_content: str) -> Any:
         try:
@@ -115,7 +117,34 @@ class OpenLigaDbSource(BaseSource):
             )
             seasons.append(season)
 
-            # Endpoint /getmatchdata/{league} fetches the CURRENT dynamic matchday
+            # 1. Historical Seasons (if configured)
+            for hist_yr in self.historical_seasons:
+                hist_season_id = f"season_{comp_id}_{hist_yr}"
+                hist_season = NormalizedSeason(
+                    id=hist_season_id,
+                    competition_id=comp_id,
+                    year_label=f"{hist_yr}/{str(hist_yr + 1)[-2:]}",
+                    is_current=False,
+                    start_date=f"{hist_yr}-08-01",
+                    end_date=f"{hist_yr + 1}-05-31",
+                )
+                seasons.append(hist_season)
+                hist_url = f"https://api.openligadb.de/getmatchdata/{league_shortcut}/{hist_yr}"
+                try:
+                    raw_html = await self.fetch_with_crawl4ai(crawler, hist_url)
+                    data = self._extract_json(raw_html)
+                    if isinstance(data, list):
+                        for item in data:
+                            match = self._normalize_match(item, sports[sport_key].id, comp_id, hist_season_id)
+                            if match:
+                                matches.append(match)
+                                synced_count += 1
+                        logger.info(f"[{self.provider_id}] Processed {len(data)} historical matches for {league_shortcut}/{hist_yr}")
+                except Exception as e:
+                    logger.error(f"[{self.provider_id}] Error collecting historical {league_shortcut}/{hist_yr}: {e}")
+                    error_msg = str(e)
+
+            # 2. Endpoint /getmatchdata/{league} fetches the CURRENT dynamic matchday
             url = f"https://api.openligadb.de/getmatchdata/{league_shortcut}"
             try:
                 raw_html = await self.fetch_with_crawl4ai(crawler, url)
@@ -127,10 +156,10 @@ class OpenLigaDbSource(BaseSource):
                         if match:
                             matches.append(match)
                             synced_count += 1
-                logger.info(f"[{self.provider_id}] Processed {len(data)} matches for {league_shortcut}")
+                logger.info(f"[{self.provider_id}] Processed {len(data)} matches for current {league_shortcut}")
 
             except Exception as e:
-                logger.error(f"[{self.provider_id}] Error collecting {league_shortcut}: {e}")
+                logger.error(f"[{self.provider_id}] Error collecting current {league_shortcut}: {e}")
                 error_msg = str(e)
 
         finished_time = get_current_utc()
@@ -180,17 +209,29 @@ class OpenLigaDbSource(BaseSource):
             # Parse results
             result = None
             if is_finished or match_results:
-                final_res = next((r for r in match_results if r.get("resultOrderID") == 2 or r.get("resultName") == "Endergebnis"), None)
+                final_res = next((r for r in match_results if r.get("resultName") == "Endergebnis" or r.get("resultOrderID") == 2), None)
+                if not final_res and match_results and is_finished:
+                    final_res = sorted(match_results, key=lambda r: r.get("resultOrderID", 0))[-1]
                 halftime_res = next((r for r in match_results if r.get("resultOrderID") == 1 or "Halbzeit" in r.get("resultName", "")), None)
 
                 if final_res:
+                    home_score = final_res.get("pointsTeam1")
+                    away_score = final_res.get("pointsTeam2")
+                    winner_id = None
+                    if home_score is not None and away_score is not None:
+                        if home_score > away_score:
+                            winner_id = home_id
+                        elif away_score > home_score:
+                            winner_id = away_id
+
                     result = NormalizedResult(
                         id=f"res_old_{match_id_raw}",
                         match_id=f"old_{match_id_raw}",
-                        home_score=final_res.get("pointsTeam1"),
-                        away_score=final_res.get("pointsTeam2"),
+                        home_score=home_score,
+                        away_score=away_score,
                         home_halftime_score=halftime_res.get("pointsTeam1") if halftime_res else None,
                         away_halftime_score=halftime_res.get("pointsTeam2") if halftime_res else None,
+                        winner_team_id=winner_id,
                     )
 
             # Statistics from goals

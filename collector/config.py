@@ -46,19 +46,23 @@ class CollectorConfig:
     enabled_sources: List[str] = field(default_factory=lambda: [
         "openligadb",
         "footballdata_fixtures",
+        "footballdata_historical",
         "thesportsdb"
     ])
     
-    # OpenLigaDB Competitions
+    # OpenLigaDB Competitions & Historical Seasons
     openligadb_leagues: Dict[str, Dict[str, str]] = field(default_factory=lambda: {
         "bl1": {"sport": "football", "name": "1. Bundesliga", "code": "BL1", "country": "Allemagne"},
         "bl2": {"sport": "football", "name": "2. Bundesliga", "code": "BL2", "country": "Allemagne"},
         "hbl": {"sport": "handball", "name": "Handball Bundesliga (HBL)", "code": "HBL", "country": "Allemagne"},
         "vblf1": {"sport": "volleyball", "name": "1. Volleyball Bundesliga Frauen", "code": "VBLF1", "country": "Allemagne"},
     })
+    openligadb_historical_seasons: List[int] = field(default_factory=lambda: [2023])
     
-    # Football-Data.co.uk URLs
+    # Football-Data.co.uk URLs & Historical Archives
     footballdata_fixtures_url: str = "https://football-data.co.uk/fixtures.csv"
+    footballdata_historical_seasons: List[str] = field(default_factory=lambda: ["2324"])
+    footballdata_historical_leagues: List[str] = field(default_factory=lambda: ["E0", "SP1"])
     
     # TheSportsDB URLs (Free V1 API key 3)
     thesportsdb_base_url: str = "https://www.thesportsdb.com/api/v1/json/3"

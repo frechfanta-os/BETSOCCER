@@ -356,6 +356,76 @@ class SportsController extends ChangeNotifier {
     };
   }
 
+  /// Couverture historique réelle par sport
+  Map<String, Map<String, dynamic>> get historicalCoverageBySport {
+    final map = <String, Map<String, dynamic>>{};
+    for (final m in _allMatches) {
+      final s = m.sportId.replaceAll('sport_', '');
+      final normSport = s == 'soccer'
+          ? 'Football'
+          : (s.isNotEmpty ? s[0].toUpperCase() + s.substring(1) : 'Sport');
+      if (!map.containsKey(normSport)) {
+        map[normSport] = {'total': 0, 'finished': 0, 'upcoming': 0};
+      }
+      map[normSport]!['total'] = (map[normSport]!['total'] as int) + 1;
+      if (m.status == MatchStatus.finished && m.result != null) {
+        map[normSport]!['finished'] = (map[normSport]!['finished'] as int) + 1;
+      } else {
+        map[normSport]!['upcoming'] = (map[normSport]!['upcoming'] as int) + 1;
+      }
+    }
+    return map;
+  }
+
+  /// Couverture historique réelle par compétition
+  List<Map<String, dynamic>> get historicalCoverageByCompetition {
+    final map = <String, Map<String, dynamic>>{};
+    for (final m in _allMatches) {
+      final compName = m.competitionName ?? m.competitionId;
+      if (!map.containsKey(compName)) {
+        map[compName] = {
+          'name': compName,
+          'sport': m.sportId.replaceAll('sport_', ''),
+          'total': 0,
+          'finished': 0,
+          'upcoming': 0,
+        };
+      }
+      map[compName]!['total'] = (map[compName]!['total'] as int) + 1;
+      if (m.status == MatchStatus.finished && m.result != null) {
+        map[compName]!['finished'] = (map[compName]!['finished'] as int) + 1;
+      } else {
+        map[compName]!['upcoming'] = (map[compName]!['upcoming'] as int) + 1;
+      }
+    }
+    final list = map.values.toList();
+    list.sort((a, b) => (b['total'] as int).compareTo(a['total'] as int));
+    return list;
+  }
+
+  /// Date de la dernière synchronisation enregistrée
+  String get lastSyncFormatted {
+    if (_syncStates.isEmpty) return 'No sync recorded';
+    final latest = _syncStates.first;
+    final dateStr = latest['last_synced_at']?.toString();
+    if (dateStr == null) return 'Never';
+    try {
+      final dt = DateTime.parse(dateStr).toLocal();
+      return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return dateStr;
+    }
+  }
+
+  /// Total des enregistrements synchronisés
+  int get totalRecordsSynced {
+    int total = 0;
+    for (final s in _syncStates) {
+      total += (s['records_synced'] as int? ?? 0);
+    }
+    return total;
+  }
+
   /// Estime les probabilités d'un match via le Moteur Statistique
   MatchPredictionResult predictMatch(
     MatchEntity match, {

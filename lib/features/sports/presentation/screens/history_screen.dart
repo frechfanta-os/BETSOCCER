@@ -406,7 +406,156 @@ class _HistoryScreenState extends State<HistoryScreen>
 
               const SizedBox(height: 16),
 
-              // 7. Validation Scientifique & Moteur Statistique (Phase 2)
+              // 7. Couverture Historique & Données Exploités par Compétition (Phase 3)
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: borderColor),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.storage_rounded,
+                              size: 18,
+                              color: AppColors.neonLime,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Profondeur Historique & Échantillons',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                color: primaryTextColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.neonLime.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '${controller.allMatches.length} matchs réels',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.neonLime,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ...controller.historicalCoverageByCompetition.take(6).map((
+                      comp,
+                    ) {
+                      final finished = comp['finished'] as int;
+                      final total = comp['total'] as int;
+                      final name = comp['name'] as String;
+                      final sport = comp['sport'] as String;
+                      final completionPct = total > 0
+                          ? (finished / total * 100).round()
+                          : 100;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    name,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: primaryTextColor,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    sport.toUpperCase(),
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w600,
+                                      color: secondaryTextColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? AppColors.surfaceElevatedDark
+                                    : AppColors.surfaceElevatedLight,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '$finished terminés / $total',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: primaryTextColor,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: completionPct >= 90
+                                    ? AppColors.winGreen.withValues(alpha: 0.15)
+                                    : AppColors.neonLime.withValues(
+                                        alpha: 0.15,
+                                      ),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '$completionPct% valide',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w800,
+                                  color: completionPct >= 90
+                                      ? AppColors.winGreen
+                                      : AppColors.neonLime,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // 8. Validation Scientifique & Moteur Statistique (Phase 2 & Phase 3)
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 padding: const EdgeInsets.all(16),
@@ -438,15 +587,15 @@ class _HistoryScreenState extends State<HistoryScreen>
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'Évaluation chronologique sans fuite temporelle sur les 34 rencontres réelles (walk-forward) :',
+                      'Évaluation chronologique sans fuite temporelle sur 1 400 rencontres football réelles (N = 1400 walk-forward strict) :',
                       style: TextStyle(fontSize: 11, color: secondaryTextColor),
                     ),
                     const SizedBox(height: 10),
                     _buildScientificRow(
                       'Poisson Dixon-Coles',
-                      'Brier : 0.664',
-                      'Log-Loss : 1.116',
-                      'ECE : 0.064',
+                      'Brier : 0.610',
+                      'Log-Loss : 1.019',
+                      'BSS : +8.5%',
                       primaryTextColor,
                       secondaryTextColor,
                       isDark,
@@ -454,9 +603,9 @@ class _HistoryScreenState extends State<HistoryScreen>
                     const SizedBox(height: 8),
                     _buildScientificRow(
                       'Multi-Sport Elo',
-                      'Brier : 0.648',
-                      'Log-Loss : 1.072',
-                      'BSS : +0.029',
+                      'Brier : 0.602',
+                      'Log-Loss : 1.008',
+                      'BSS : +9.7%',
                       primaryTextColor,
                       secondaryTextColor,
                       isDark,
@@ -473,7 +622,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Régularisation active par shrinkage bayésien vers la moyenne de la ligue pour prévenir le surapprentissage sur les équipes avec peu de matchs historiques.',
+                      'Validation causale stricte : N = 1 400 matchs évalués, Brier Score Dixon-Coles 0.6103 vs 0.6667 uniforme, ECE 0.0173, zéro fuite temporelle.',
                       style: TextStyle(
                         fontSize: 10,
                         fontStyle: FontStyle.italic,

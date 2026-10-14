@@ -244,6 +244,91 @@ class TestDatabaseManager(unittest.TestCase):
             self.assertEqual(row["records_synced"], 15)
 
 
+    def test_team_canonical_resolution_avoids_fk_violation(self):
+        # Setup Sport & Comp
+        sport = NormalizedSport(id="sport_football", name="Football", code="SOCCER", source_provider="test")
+        self.db.upsert_sport(sport)
+        comp = NormalizedCompetition(id="comp_pl", sport_id="sport_football", name="Premier League", source_provider="test")
+        self.db.upsert_competition(comp)
+
+        # Team inserted with ID 'team_arsenal_fc'
+        self.db.upsert_team(NormalizedTeam(id="team_arsenal_fc", sport_id="sport_football", name="Arsenal", source_provider="tsdb"))
+
+        # Ingest a match where home_team_id is 'team_arsenal' (different id, same name)
+        match = NormalizedMatch(
+            id="match_ars_che",
+            sport_id="sport_football",
+            competition_id="comp_pl",
+            home_team_id="team_arsenal",
+            home_team_name="Arsenal",
+            away_team_id="team_chelsea",
+            away_team_name="Chelsea",
+            utc_kickoff="2026-10-18T15:00:00Z",
+            status="finished",
+            source_provider="fduk",
+            source_match_id="fduk_1",
+            result=NormalizedResult(
+                id="res_ars_che",
+                match_id="match_ars_che",
+                home_score=2,
+                away_score=0,
+                winner_team_id="team_arsenal",
+            ),
+        )
+        saved = self.db.save_matches_batch([match])
+        self.assertEqual(saved, 1)
+
+        # Confirm match home_team_id was resolved canonically to team_arsenal_fc
+        with self.db.get_connection() as conn:
+            row = conn.execute("SELECT home_team_id FROM matches WHERE id = 'match_ars_che';").fetchone()
+            self.assertEqual(row["home_team_id"], "team_arsenal_fc")
+            res_row = conn.execute("SELECT winner_team_id FROM results WHERE match_id = 'match_ars_che';").fetchone()
+            self.assertEqual(res_row["winner_team_id"], "team_arsenal_fc")
+
+    def test_idempotent_double_sync(self):
+        sport = NormalizedSport(id="sport_football", name="Football", code="SOCCER", source_provider="test")
+        self.db.upsert_sport(sport)
+        comp = NormalizedCompetition(id="comp_pl", sport_id="sport_football", name="Premier League", source_provider="test")
+        self.db.upsert_competition(comp)
+
+        matches = [
+            NormalizedMatch(
+                id=f"match_{i}",
+                sport_id="sport_football",
+                competition_id="comp_pl",
+                home_team_id=f"team_h_{i}",
+                home_team_name=f"Home {i}",
+                away_team_id=f"team_a_{i}",
+                away_team_name=f"Away {i}",
+                utc_kickoff=f"2026-10-{10+i}T15:00:00Z",
+                status="finished",
+                source_provider="fduk",
+                source_match_id=f"src_{i}",
+                result=NormalizedResult(
+                    id=f"res_{i}",
+                    match_id=f"match_{i}",
+                    home_score=1,
+                    away_score=0,
+                ),
+            )
+            for i in range(5)
+        ]
+
+        # First save
+        cnt1 = self.db.save_matches_batch(matches)
+        self.assertEqual(cnt1, 5)
+
+        # Second save (idempotency check)
+        cnt2 = self.db.save_matches_batch(matches)
+        self.assertEqual(cnt2, 5)
+
+        with self.db.get_connection() as conn:
+            total_matches = conn.execute("SELECT COUNT(*) FROM matches;").fetchone()[0]
+            total_results = conn.execute("SELECT COUNT(*) FROM results;").fetchone()[0]
+            self.assertEqual(total_matches, 5)
+            self.assertEqual(total_results, 5)
+
+
 class TestSourceParsers(unittest.TestCase):
     def test_openligadb_json_extraction(self):
         source = OpenLigaDbSource()
@@ -255,8 +340,8 @@ class TestSourceParsers(unittest.TestCase):
                 "team2": {"teamId": 7, "teamName": "Borussia Dortmund", "shortName": "BVB"},
                 "matchIsFinished": True,
                 "matchResults": [
-                    {"resultName": "Halbzeitergebnis", "pointsTeam1": 1, "pointsTeam2": 0},
-                    {"resultName": "Endergebnis", "pointsTeam1": 2, "pointsTeam2": 1},
+                    {"resultName": "Halbzeitergebnis", "pointsTeam1": 1, "pointsTeam2": 0, "resultOrderID": 1},
+                    {"resultName": "Endergebnis", "pointsTeam1": 2, "pointsTeam2": 1, "resultOrderID": 2},
                 ],
                 "group": {"groupOrderID": 7, "groupName": "7. Spieltag"},
                 "goals": [
@@ -268,6 +353,26 @@ class TestSourceParsers(unittest.TestCase):
         self.assertIsInstance(parsed, list)
         self.assertEqual(len(parsed), 1)
         self.assertEqual(parsed[0]["matchID"], 71001)
+
+    def test_openligadb_handball_result_normalization(self):
+        source = OpenLigaDbSource()
+        item = {
+            "matchID": 901,
+            "matchDateTimeUTC": "2023-09-01T17:00:00Z",
+            "team1": {"teamId": 10, "teamName": "THW Kiel"},
+            "team2": {"teamId": 20, "teamName": "SG Flensburg-Handewitt"},
+            "matchIsFinished": True,
+            "matchResults": [
+                {"resultName": "Endergebnis", "pointsTeam1": 28, "pointsTeam2": 26, "resultOrderID": 1}
+            ],
+        }
+        match = source._normalize_match(item, "sport_handball", "comp_old_hbl", "season_2023")
+        self.assertIsNotNone(match)
+        self.assertEqual(match.status, "finished")
+        self.assertIsNotNone(match.result)
+        self.assertEqual(match.result.home_score, 28)
+        self.assertEqual(match.result.away_score, 26)
+        self.assertEqual(match.result.winner_team_id, "team_thw_kiel")
 
     def test_footballdata_csv_fixtures_parsing(self):
         sample_csv = (
@@ -285,6 +390,58 @@ class TestSourceParsers(unittest.TestCase):
         self.assertEqual(row0["HomeTeam"], "Arsenal")
         self.assertEqual(row0["AwayTeam"], "Chelsea")
         self.assertEqual(row0["B365H"], "1.85")
+
+    def test_footballdata_historical_row_normalization(self):
+        from collector.sources.footballdata_historical_source import FootballDataHistoricalSource
+        source = FootballDataHistoricalSource()
+        row = {
+            "Div": "E0",
+            "Date": "11/08/2023",
+            "Time": "20:00",
+            "HomeTeam": "Burnley",
+            "AwayTeam": "Man City",
+            "FTHG": "0",
+            "FTAG": "3",
+            "FTR": "A",
+            "HTHG": "0",
+            "HTAG": "2",
+            "HTR": "A",
+            "Referee": "C Pawson",
+            "HS": "6",
+            "AS": "17",
+            "HST": "1",
+            "AST": "8",
+            "HF": "11",
+            "AF": "8",
+            "HC": "6",
+            "AC": "5",
+            "HY": "0",
+            "AY": "0",
+            "HR": "1",
+            "AR": "0",
+        }
+        match = source._normalize_csv_row(row, "sport_football", "comp_fduk_e0", "season_e0_2023", "E0")
+        self.assertIsNotNone(match)
+        self.assertEqual(match.status, "finished")
+        self.assertEqual(match.utc_kickoff, "2023-08-11T20:00:00Z")
+        self.assertIsNotNone(match.result)
+        self.assertEqual(match.result.home_score, 0)
+        self.assertEqual(match.result.away_score, 3)
+        self.assertEqual(match.result.home_halftime_score, 0)
+        self.assertEqual(match.result.away_halftime_score, 2)
+        self.assertEqual(match.result.winner_team_id, "team_man_city")
+
+        # Verify statistics extracted
+        stats_by_name = {s.metric_name: s for s in match.statistics}
+        self.assertIn("shots", stats_by_name)
+        self.assertEqual(stats_by_name["shots"].home_value, 6.0)
+        self.assertEqual(stats_by_name["shots"].away_value, 17.0)
+        self.assertIn("shots_on_target", stats_by_name)
+        self.assertEqual(stats_by_name["shots_on_target"].away_value, 8.0)
+        self.assertIn("red_cards", stats_by_name)
+        self.assertEqual(stats_by_name["red_cards"].home_value, 1.0)
+        self.assertIn("referee_assigned", stats_by_name)
+        self.assertEqual(stats_by_name["referee_assigned"].raw_unit, "C Pawson")
 
 
 if __name__ == "__main__":

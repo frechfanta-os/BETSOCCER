@@ -123,13 +123,13 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      'Manage sources and synchronization',
+                      '${controller.totalRecordsSynced} records synced • Autonomous Crawl4AI',
                       style: TextStyle(fontSize: 11, color: secondaryTextColor),
                     ),
                   ],
                 ),
                 Text(
-                  'Last sync: Oct 13, 2026 14:25',
+                  'Last: ${controller.lastSyncFormatted}',
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
@@ -140,13 +140,64 @@ class SettingsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 10),
 
+            // Bouton de Synchronisation Manuelle
+            OutlinedButton.icon(
+              onPressed: () async {
+                await controller.loadInitialData();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      backgroundColor: AppColors.surfaceElevatedDark,
+                      content: Row(
+                        children: [
+                          const Icon(
+                            Icons.check_circle_rounded,
+                            color: AppColors.neonLime,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Base synchronisée : ${controller.allMatches.length} matchs réels chargés.',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+              },
+              icon: const Icon(
+                Icons.sync_rounded,
+                size: 16,
+                color: AppColors.neonLime,
+              ),
+              label: const Text(
+                'Sync & Refresh Local SQLite',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.neonLime,
+                side: const BorderSide(color: AppColors.neonLime),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+            const SizedBox(height: 10),
+
             // Cartes Fournisseurs
             _buildDataSourceTile(
               name: 'OpenLigaDB',
-              subtitle: 'Football • Handball • Volleyball',
+              subtitle: '936 records • 1. & 2. Bundesliga, HBL, VBLF1',
               icon: Icons.sports_soccer_rounded,
               isSynced: true,
-              timeAgo: '2 min ago',
+              timeAgo: 'Active (2023/24 + Live)',
               cardBg: cardBg,
               borderColor: borderColor,
               primaryColor: primaryTextColor,
@@ -154,10 +205,10 @@ class SettingsScreen extends StatelessWidget {
             ),
             _buildDataSourceTile(
               name: 'Football-Data.co.uk',
-              subtitle: 'Football (Fixtures & Results)',
+              subtitle: '774 records • EPL, La Liga, Halftimes & 7 Match Stats',
               icon: Icons.public_rounded,
               isSynced: true,
-              timeAgo: '5 min ago',
+              timeAgo: 'Active (Historical + Fixtures)',
               cardBg: cardBg,
               borderColor: borderColor,
               primaryColor: primaryTextColor,
@@ -165,21 +216,21 @@ class SettingsScreen extends StatelessWidget {
             ),
             _buildDataSourceTile(
               name: 'TheSportsDB',
-              subtitle: 'Multi-sport (Leagues & Teams)',
+              subtitle: '15 records • Multi-sport Events & Teams',
               icon: Icons.storage_rounded,
               isSynced: true,
-              timeAgo: '12 min ago',
+              timeAgo: 'Active (V1 Free)',
               cardBg: cardBg,
               borderColor: borderColor,
               primaryColor: primaryTextColor,
               secondaryColor: secondaryTextColor,
             ),
             _buildDataSourceTile(
-              name: 'MelBet (Disabled)',
-              subtitle: 'Restricted by policy',
+              name: 'MelBet (Disabled by Policy)',
+              subtitle: '0 records • Verrou de sécurité éthique actif',
               icon: Icons.block_rounded,
               isSynced: false,
-              timeAgo: 'Disabled',
+              timeAgo: 'LOCKED',
               cardBg: cardBg,
               borderColor: borderColor,
               primaryColor: primaryTextColor,

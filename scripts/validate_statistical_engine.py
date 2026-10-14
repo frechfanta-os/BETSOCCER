@@ -335,7 +335,7 @@ def run_scientific_validation(db_path='betsoccer.db'):
     print(f"     - Précision : 33.33% | Brier Score: {res_strict['uniform_baseline']['brier_score']:.4f} | Log-Loss: {res_strict['uniform_baseline']['log_loss']:.4f}")
 
     print(f"\n2. COMPARAISON AVEC ANCIEN MODE SLICE (Avec fuite simultanée, N = {res_slice['evaluated_count']}) :")
-    print(f"   - Poisson Hit rate : {res_slice['poisson']['accuracy']*100:.2f}% ({res_slice['poisson']['correct']}/30) -> Strict: {res_strict['poisson']['accuracy']*100:.2f}% (13/28)")
+    print(f"   - Poisson Hit rate : {res_slice['poisson']['accuracy']*100:.2f}% ({res_slice['poisson']['correct']}/{res_slice['evaluated_count']}) -> Strict: {res_strict['poisson']['accuracy']*100:.2f}% ({res_strict['poisson']['correct']}/{res_strict['evaluated_count']})")
     print(f"   - Poisson Brier    : {res_slice['poisson']['brier_score']:.4f} -> Strict: {res_strict['poisson']['brier_score']:.4f}")
     print(f"   - Poisson LogLoss  : {res_slice['poisson']['log_loss']:.4f} -> Strict: {res_strict['poisson']['log_loss']:.4f}")
     print(f"   - Elo Brier        : {res_slice['elo']['brier_score']:.4f} -> Strict: {res_strict['elo']['brier_score']:.4f}")

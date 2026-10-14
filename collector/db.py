@@ -277,6 +277,45 @@ class DatabaseManager:
                     source_provider = excluded.source_provider;
             """, (team.id, team.sport_id, team.name, team.short_name, team.tla, team.badge_url, team.country, team.elo_rating, team.source_provider, now_iso))
 
+    def _resolve_team_id(
+        self,
+        conn: sqlite3.Connection,
+        sport_id: str,
+        team_id: str,
+        team_name: str,
+        source_provider: str,
+        now_iso: str,
+    ) -> str:
+        """
+        Resolves or inserts a team canonically:
+        1. Look up by (sport_id, name)
+        2. Look up by id
+        3. If not existing, insert with team_id
+        Guarantees that the returned ID actually exists in teams table, preventing FK violations.
+        """
+        row = conn.execute(
+            "SELECT id FROM teams WHERE sport_id = ? AND name = ?;",
+            (sport_id, team_name),
+        ).fetchone()
+        if row:
+            return row["id"]
+
+        row_by_id = conn.execute(
+            "SELECT id FROM teams WHERE id = ?;",
+            (team_id,),
+        ).fetchone()
+        if row_by_id:
+            return row_by_id["id"]
+
+        conn.execute(
+            """
+            INSERT INTO teams (id, sport_id, name, source_provider, created_at)
+            VALUES (?, ?, ?, ?, ?);
+            """,
+            (team_id, sport_id, team_name, source_provider, now_iso),
+        )
+        return team_id
+
     def save_matches_batch(self, matches: List[NormalizedMatch]) -> int:
         """
         Idempotent transactional batch save for matches, results and statistics.
@@ -290,15 +329,13 @@ class DatabaseManager:
 
         with self.get_connection() as conn:
             for m in matches:
-                # 1. Upsert teams first to satisfy FK
-                conn.execute("""
-                    INSERT OR IGNORE INTO teams (id, sport_id, name, source_provider, created_at)
-                    VALUES (?, ?, ?, ?, ?);
-                """, (m.home_team_id, m.sport_id, m.home_team_name, m.source_provider, now_iso))
-                conn.execute("""
-                    INSERT OR IGNORE INTO teams (id, sport_id, name, source_provider, created_at)
-                    VALUES (?, ?, ?, ?, ?);
-                """, (m.away_team_id, m.sport_id, m.away_team_name, m.source_provider, now_iso))
+                # 1. Resolve canonical teams first to satisfy FK
+                resolved_home_id = self._resolve_team_id(
+                    conn, m.sport_id, m.home_team_id, m.home_team_name, m.source_provider, now_iso
+                )
+                resolved_away_id = self._resolve_team_id(
+                    conn, m.sport_id, m.away_team_id, m.away_team_name, m.source_provider, now_iso
+                )
 
                 # 2. Upsert match with unique composite constraint
                 cursor = conn.execute("""
@@ -315,7 +352,7 @@ class DatabaseManager:
                         last_synced_at = excluded.last_synced_at,
                         source_provider = excluded.source_provider;
                 """, (
-                    m.id, m.sport_id, m.competition_id, m.season_id, m.home_team_id, m.away_team_id,
+                    m.id, m.sport_id, m.competition_id, m.season_id, resolved_home_id, resolved_away_id,
                     m.utc_kickoff, m.status, m.matchday, m.round_label, m.current_minute,
                     1 if m.is_sample_data else 0, m.source_provider, m.source_match_id,
                     now_iso, now_iso
@@ -326,12 +363,21 @@ class DatabaseManager:
                 row = conn.execute("""
                     SELECT id FROM matches 
                     WHERE competition_id = ? AND home_team_id = ? AND away_team_id = ? AND utc_kickoff = ?;
-                """, (m.competition_id, m.home_team_id, m.away_team_id, m.utc_kickoff)).fetchone()
+                """, (m.competition_id, resolved_home_id, resolved_away_id, m.utc_kickoff)).fetchone()
                 actual_match_id = row["id"] if row else m.id
 
                 # 3. Upsert result if available
                 if m.result:
                     res = m.result
+                    winner_id = None
+                    if res.winner_team_id:
+                        if res.winner_team_id == m.home_team_id:
+                            winner_id = resolved_home_id
+                        elif res.winner_team_id == m.away_team_id:
+                            winner_id = resolved_away_id
+                        else:
+                            winner_id = res.winner_team_id
+
                     conn.execute("""
                         INSERT INTO results (
                             id, match_id, home_score, away_score,
@@ -352,7 +398,7 @@ class DatabaseManager:
                         res.home_halftime_score, res.away_halftime_score,
                         res.home_extratime_score, res.away_extratime_score,
                         res.home_penalties_score, res.away_penalties_score,
-                        res.winner_team_id, now_iso
+                        winner_id, now_iso
                     ))
 
                 # 4. Upsert statistics if available
