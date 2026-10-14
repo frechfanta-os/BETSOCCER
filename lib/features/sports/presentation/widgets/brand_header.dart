@@ -33,26 +33,37 @@ class BrandHeader extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
       child: Row(
         children: [
-          // Logo Ballon de foot néon & noir stylisé
+          // Logo officiel de l'application BETSOCCER
           Container(
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.neonLime,
+              borderRadius: BorderRadius.circular(10),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.neonLime.withValues(alpha: 0.3),
+                  color: AppColors.neonLime.withValues(alpha: 0.35),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
               ],
             ),
-            child: const Center(
-              child: Icon(
-                Icons.sports_soccer_rounded,
-                size: 24,
-                color: Color(0xFF0A111F),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.asset(
+                'assets/icons/app_icon.png',
+                width: 36,
+                height: 36,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  color: AppColors.neonLime,
+                  child: const Center(
+                    child: Icon(
+                      Icons.sports_soccer_rounded,
+                      size: 22,
+                      color: Color(0xFF0A111F),
+                    ),
+                  ),
+                ),
               ),
             ),
           ),

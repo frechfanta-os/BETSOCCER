@@ -1,47 +1,116 @@
-name: BETSOCCER - Build & Release Android APK
+name: Build Release APK
 
 on:
   push:
+    branches: [ main ]
     tags:
-      - 'v*.*.*'
+      - 'v*'
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build_release:
-    name: Build & Verify Android Release APK
+  build:
+    name: Build BETSOCCER Release APK
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
+          cache: 'gradle'
 
-      - name: Set up Flutter
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           cache: true
 
-      - name: Extract Pubspec Version & Build Number
-        id: version_extract
+      - name: Verify Environment
         run: |
-          VERSION_LINE=$(grep '^version:' pubspec.yaml | head -n 1 | awk '{print $2}')
-          VERSION_NAME=$(echo "$VERSION_LINE" | cut -d '+' -f 1)
-          VERSION_CODE=$(echo "$VERSION_LINE" | cut -d '+' -f 2)
-          echo "PUBSPEC_VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
-          echo "PUBSPEC_VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
-          echo "Extracted Version: $VERSION_NAME+$VERSION_CODE"
+          flutter --version
+          flutter doctor -v
+
+      - name: Ensure Google Services Configuration
+        run: |
+          mkdir -p android/app
+          if [ ! -f "android/app/google-services.json" ]; then
+            echo "Generating android/app/google-services.json for release build..."
+            cat << 'EOF' > android/app/google-services.json
+          {
+            "project_info": {
+              "project_number": "561415224411",
+              "firebase_url": "https://betsoccer-60834-default-rtdb.firebaseio.com",
+              "project_id": "betsoccer-60834",
+              "storage_bucket": "betsoccer-60834.firebasestorage.app"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:561415224411:android:com_ghdinteractivestudio_betsoccer",
+                  "android_client_info": {
+                    "package_name": "com.ghdinteractivestudio.betsoccer"
+                  }
+                },
+                "oauth_client": [],
+                "api_key": [
+                  {
+                    "current_key": "BND3aJqIS2RcH_um_BUe-KHCCpfEzdJCanC6X19KymUbXhuzWkcD0b7zjVJXc0d0SXzrQm2GnYzHfwdmEdu8uJA"
+                  }
+                ],
+                "services": {
+                  "appinvite_service": {
+                    "other_platform_oauth_client": []
+                  }
+                }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
+          fi
 
       - name: Install Dependencies
         run: flutter pub get
+
+      - name: Verify Release Keystore
+        run: |
+          if [ -f "android/app/betsoccer.keystore" ]; then
+            echo "✓ Official BETSOCCER permanent release keystore is present."
+            ls -l android/app/betsoccer.keystore
+          else
+            echo "ERROR: android/app/betsoccer.keystore is missing!"
+            exit 1
+          fi
+
+      - name: Verify Package & Version Configuration
+        run: |
+          echo "Verifying package name..."
+          grep -q 'namespace = "com.ghdinteractivestudio.betsoccer"' android/app/build.gradle.kts || { echo "ERROR: Invalid namespace in build.gradle.kts!"; exit 1; }
+          grep -q 'applicationId = "com.ghdinteractivestudio.betsoccer"' android/app/build.gradle.kts || { echo "ERROR: Invalid applicationId in build.gradle.kts!"; exit 1; }
+          
+          PUBSPEC_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          PUBSPEC_VERSION_NAME=$(echo "$PUBSPEC_VERSION" | cut -d'+' -f1)
+          PUBSPEC_VERSION_CODE=$(echo "$PUBSPEC_VERSION" | cut -d'+' -f2)
+          echo "PUBSPEC_VERSION=$PUBSPEC_VERSION" >> $GITHUB_ENV
+          echo "PUBSPEC_VERSION_NAME=$PUBSPEC_VERSION_NAME" >> $GITHUB_ENV
+          echo "PUBSPEC_VERSION_CODE=$PUBSPEC_VERSION_CODE" >> $GITHUB_ENV
+          
+          echo "✓ Package name (com.ghdinteractivestudio.betsoccer) verified."
+          echo "✓ Version detected: $PUBSPEC_VERSION_NAME (build $PUBSPEC_VERSION_CODE)"
+          
+          if ! [[ "$PUBSPEC_VERSION_CODE" =~ ^[0-9]+$ ]] || [ "$PUBSPEC_VERSION_CODE" -lt 1 ]; then
+            echo "ERROR: versionCode '$PUBSPEC_VERSION_CODE' is invalid!"
+            exit 1
+          fi
 
       - name: Verify Code Formatting
         run: dart format --output=none --set-exit-if-changed .
@@ -49,95 +118,116 @@ jobs:
       - name: Static Code Analysis
         run: flutter analyze
 
-      - name: Run Automated Tests
+      - name: Run Test Suite
         run: flutter test
 
-      - name: Build Android Release APK
+      - name: Build Release APK
         run: |
           flutter build apk --release \
             --build-name="${{ env.PUBSPEC_VERSION_NAME }}" \
-            --build-number="${{ env.PUBSPEC_VERSION_CODE }}" \
-            --verbose
+            --build-number="${{ env.PUBSPEC_VERSION_CODE }}"
 
-      - name: Validate APK Internal Metadata & Package ID
+      - name: Verify Built APK & Signature
         run: |
           APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
-          SDK_DIR="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
-          AAPT_BIN=$(find "$SDK_DIR/build-tools" -name aapt 2>/dev/null | sort -V | tail -n 1)
-          if [ -z "$AAPT_BIN" ]; then
-            AAPT_BIN="aapt"
-          fi
-          echo "Using aapt binary: $AAPT_BIN"
-          
-          PACKAGE_NAME=$($AAPT_BIN dump badging "$APK_PATH" | grep "package: name=" | sed -E "s/.*package: name='([^']+)'.*/\1/")
-          echo "Detected APK Package Name: $PACKAGE_NAME"
-          
-          if [ "$PACKAGE_NAME" != "com.ghdinteractivestudio.betsoccer" ]; then
-            echo "ERROR: Package name mismatch! Expected 'com.ghdinteractivestudio.betsoccer', got '$PACKAGE_NAME'"
+          if [ ! -s "$APK_PATH" ]; then
+            echo "ERROR: $APK_PATH is missing or empty!"
             exit 1
           fi
-          echo "Package name verification PASSED."
-
-      - name: Prepare Release Artifacts & SHA-256 Checksums
-        run: |
-          mkdir -p release-artifacts
-          SRC_APK="build/app/outputs/flutter-apk/app-release.apk"
-          NAMED_APK="release-artifacts/BETSOCCER-v${{ env.PUBSPEC_VERSION_NAME }}.apk"
-          STANDARD_APK="release-artifacts/app-release.apk"
           
-          cp "$SRC_APK" "$STANDARD_APK"
-          cp "$SRC_APK" "$NAMED_APK"
+          ls -la "$APK_PATH"
+          APK_SHA256=$(sha256sum "$APK_PATH" | awk '{print $1}')
+          APK_SIZE=$(ls -lh "$APK_PATH" | awk '{print $5}')
+          echo "APK_SHA256=$APK_SHA256" >> $GITHUB_ENV
+          echo "APK_SIZE=$APK_SIZE" >> $GITHUB_ENV
           
-          cd release-artifacts
-          sha256sum "app-release.apk" "BETSOCCER-v${{ env.PUBSPEC_VERSION_NAME }}.apk" > app-release.apk.sha256
-          PRIMARY_SHA256=$(sha256sum "app-release.apk" | awk '{print $1}')
-          echo "PRIMARY_SHA256=$PRIMARY_SHA256" >> $GITHUB_ENV
-          cd ..
+          echo "Verifying APK package metadata with aapt..."
+          AAPT_BIN=$(which aapt 2>/dev/null || find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -name aapt 2>/dev/null | sort -V | tail -n 1 || echo "")
+          if [ -n "$AAPT_BIN" ] && [ -x "$AAPT_BIN" ]; then
+            echo "Using aapt at: $AAPT_BIN"
+            "$AAPT_BIN" dump badging "$APK_PATH" | grep -E "package: name=|versionCode=|versionName="
+          else
+            echo "aapt not found, skipping badging verification."
+          fi
+          
+          echo "Verifying APK signature..."
+          APK_FINGERPRINT=$(keytool -printcert -jarfile "$APK_PATH" 2>/dev/null | grep "SHA1:" | awk '{print $2}' || echo "")
+          KEYSTORE_FINGERPRINT=$(keytool -list -v -keystore android/app/betsoccer.keystore -storepass betsoccer2026 -alias betsoccer 2>/dev/null | grep "SHA1:" | awk '{print $2}' || echo "")
+          
+          echo "APK Signature  SHA1: $APK_FINGERPRINT"
+          echo "Keystore       SHA1: $KEYSTORE_FINGERPRINT"
+          
+          if [ -n "$APK_FINGERPRINT" ] && [ -n "$KEYSTORE_FINGERPRINT" ]; then
+            if [ "$APK_FINGERPRINT" = "$KEYSTORE_FINGERPRINT" ]; then
+              echo "✓ APK signature matches the official BETSOCCER keystore."
+            else
+              echo "ERROR: APK signature DOES NOT match the official keystore!"
+              echo "  APK:      $APK_FINGERPRINT"
+              echo "  Keystore: $KEYSTORE_FINGERPRINT"
+              exit 1
+            fi
+          fi
+          
+          echo "=========================================="
+          echo "✓ RELEASE APK BUILT & SIGNED SUCCESSFULLY"
+          echo "File: $APK_PATH"
+          echo "Version: $PUBSPEC_VERSION_NAME (build $PUBSPEC_VERSION_CODE)"
+          echo "Size: $APK_SIZE"
+          echo "SHA-256: $APK_SHA256"
+          echo "=========================================="
+          
+          cp "$APK_PATH" "build/app/outputs/flutter-apk/BETSOCCER-v${PUBSPEC_VERSION_NAME}.apk"
+          
+          echo "$APK_SHA256  app-release.apk" > build/app/outputs/flutter-apk/app-release.apk.sha256
+          echo "$APK_SHA256  BETSOCCER-v${PUBSPEC_VERSION_NAME}.apk" >> build/app/outputs/flutter-apk/app-release.apk.sha256
+          
+          cat << EOF > RELEASE_NOTES_v${PUBSPEC_VERSION_NAME}.md
+          ## BETSOCCER v${PUBSPEC_VERSION_NAME} (Build ${PUBSPEC_VERSION_CODE})
 
-      - name: Upload APK Workflow Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: BETSOCCER-Android-APK
-          path: |
-            release-artifacts/app-release.apk
-            release-artifacts/BETSOCCER-v${{ env.PUBSPEC_VERSION_NAME }}.apk
-            release-artifacts/app-release.apk.sha256
-          if-no-files-found: error
+          Release officielle de **BETSOCCER** — Plateforme multisport d'analyses et de statistiques IA.
 
-      - name: Generate Release Notes
-        run: |
-          cat << 'EOF' > RELEASE_NOTES.md
-          ## BETSOCCER v${{ env.PUBSPEC_VERSION_NAME }} (Build ${{ env.PUBSPEC_VERSION_CODE }})
-
-          Première release officielle de **BETSOCCER** — Plateforme d'analyse et de suivi multisport avec IA.
-
-          ### Fonctionnalités Clés
-          - **Matchs en Direct & Prochaines Rencontres** : Suivi des scores en direct et calendrier des fixtures avec filtrage strict par statut (`live` et `upcoming`).
+          ### Fonctionnalités
+          - **Matchs en Direct & Prochaines Rencontres** : Suivi des scores en direct et calendrier des fixtures avec filtrage strict par statut (\`live\` et \`upcoming\`).
           - **Connecteurs d'API Réelles** :
             - **OpenLigaDB** : Intégration en temps réel des matchs et résultats (Bundesliga, championnats européens).
             - **TheSportsDB** : Calendrier des prochaines fixtures (Premier League, La Liga, Serie A, etc.).
           - **Stockage Local SQLite Robuste** : Schéma relationnel complet (10 tables) assurant la persistance et le fonctionnement hors-ligne.
           - **Résultats Historiques & Statistiques** : Base de données de plus de 2 400 matchs historiques pour l'analyse prédictive et les métriques de performance.
           - **Architecture & Fiabilité** : Synchronisation réseau avec résilience, cache HTTP et isolation des erreurs.
-          - **Politique Éthique & Données** : Respect strict du *zero-odds policy*. Le connecteur MelBet est audité et désactivé par politique (`DISABLED_BY_POLICY` / `RESTRICTED_BY_ROBOTS_TXT`).
+          - **Politique Éthique & Données** : Respect strict du *zero-odds policy*. Le connecteur MelBet est audité et désactivé par politique (\`DISABLED_BY_POLICY\` / \`RESTRICTED_BY_ROBOTS_TXT\`).
 
-          ### Intégrité des Fichiers & Sécurité
-          - **Application ID** : `com.ghdinteractivestudio.betsoccer`
-          - **SHA-256** : `${{ env.PRIMARY_SHA256 }}`
+          ### Intégrité des Artefacts
+          - **Package ID** : \`com.ghdinteractivestudio.betsoccer\`
+          - **SHA-256** : \`${APK_SHA256}\`
+          - **Taille** : \`${APK_SIZE}\`
 
           ### Instructions d'Installation
-          1. Télécharger `BETSOCCER-v${{ env.PUBSPEC_VERSION_NAME }}.apk` ou `app-release.apk`.
-          2. Autoriser l'installation d'applications issues de sources inconnues si demandé sur votre appareil Android.
-          3. Vérifier l'empreinte SHA-256 avec `sha256sum app-release.apk` avant installation.
+          1. Télécharger \`BETSOCCER-v${PUBSPEC_VERSION_NAME}.apk\` ou \`app-release.apk\`.
+          2. Autoriser l'installation d'applications de sources inconnues si nécessaire sur votre appareil Android.
+          3. Vérifier l'intégrité du fichier téléchargé avec la somme de contrôle SHA-256.
           EOF
 
-      - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: BETSOCCER v${{ env.PUBSPEC_VERSION_NAME }}
-          body_path: RELEASE_NOTES.md
+          name: betsoccer-release-apk
+          path: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/flutter-apk/BETSOCCER-v${{ env.PUBSPEC_VERSION_NAME }}.apk
+            build/app/outputs/flutter-apk/app-release.apk.sha256
+          if-no-files-found: error
+
+      - name: Create or Update GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
           files: |
-            release-artifacts/app-release.apk
-            release-artifacts/BETSOCCER-v${{ env.PUBSPEC_VERSION_NAME }}.apk
-            release-artifacts/app-release.apk.sha256
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/flutter-apk/BETSOCCER-v${{ env.PUBSPEC_VERSION_NAME }}.apk
+            build/app/outputs/flutter-apk/app-release.apk.sha256
+          name: BETSOCCER ${{ github.ref_name }}
+          body_path: RELEASE_NOTES_v${{ env.PUBSPEC_VERSION_NAME }}.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

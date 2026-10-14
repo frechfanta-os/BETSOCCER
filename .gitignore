@@ -51,6 +51,7 @@ migrate_working_dir/
 .env.*
 *.keystore
 *.jks
+!android/app/betsoccer.keystore
 *.key
 credentials.json
 google-services.json

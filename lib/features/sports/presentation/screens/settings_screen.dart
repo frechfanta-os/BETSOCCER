@@ -57,19 +57,28 @@ class SettingsScreen extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isDark
-                          ? AppColors.surfaceElevatedDark
-                          : AppColors.surfaceElevatedLight,
-                    ),
-                    child: Icon(
-                      Icons.person_outline_rounded,
-                      size: 26,
-                      color: primaryTextColor,
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.asset(
+                      'assets/icons/app_icon.png',
+                      width: 48,
+                      height: 48,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          color: isDark
+                              ? AppColors.surfaceElevatedDark
+                              : AppColors.surfaceElevatedLight,
+                        ),
+                        child: Icon(
+                          Icons.sports_soccer_rounded,
+                          size: 26,
+                          color: primaryTextColor,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 14),
