@@ -24,9 +24,6 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -64,7 +61,11 @@ jobs:
       - name: Validate APK Internal Metadata & Package ID
         run: |
           APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
-          AAPT_BIN=$(find $ANDROID_HOME/build-tools -name aapt | sort -V | tail -n 1)
+          SDK_DIR="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          AAPT_BIN=$(find "$SDK_DIR/build-tools" -name aapt 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$AAPT_BIN" ]; then
+            AAPT_BIN="aapt"
+          fi
           echo "Using aapt binary: $AAPT_BIN"
           
           PACKAGE_NAME=$($AAPT_BIN dump badging "$APK_PATH" | grep "package: name=" | sed -E "s/.*package: name='([^']+)'.*/\1/")
