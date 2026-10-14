@@ -2,6 +2,30 @@ import '../entities/sport.dart';
 import '../entities/competition.dart';
 import '../entities/match.dart';
 
+/// Statut d'accessibilité et de conformité d'un connecteur de données sportives
+enum ConnectorAccessStatus {
+  /// Connecteur actif et pleinement disponible
+  available,
+
+  /// Désactivé via la configuration de l'application
+  disabledByConfig,
+
+  /// Restreint par les directives robots.txt du fournisseur
+  restrictedByRobotsTxt,
+
+  /// Bloqué par les défenses anti-bot (Cloudflare, firewall, timeout)
+  antiBotBlocked,
+
+  /// Strictement désactivé par politique interne du projet (ex: CGU, paris/cotes)
+  disabledByPolicy,
+
+  /// Clé d'API ou authentification requise mais manquante
+  authenticationRequired,
+
+  /// Quota d'appels temporairement dépassé
+  rateLimited,
+}
+
 /// Interface commune et contrat universel des fournisseurs de données sportives
 abstract interface class SportsDataSource {
   /// Identifiant unique du fournisseur (ex: "openfootball", "thesportsdb", "football_data_org", "melbet_restricted")
@@ -12,6 +36,18 @@ abstract interface class SportsDataSource {
 
   /// Indique si le connecteur est activé selon les règles de gouvernance
   bool get isEnabled;
+
+  /// Statut détaillé d'accès et d'observabilité
+  ConnectorAccessStatus get accessStatus;
+
+  /// Horodatage de la dernière vérification d'accès
+  DateTime? get lastCheckedAt;
+
+  /// Dernier message d'erreur ou motif de restriction
+  String? get lastError;
+
+  /// Types de données pris en charge (ex: 'sports', 'competitions', 'matches')
+  List<String> get supportedDataTypes;
 
   /// Capacités déclarées par le connecteur
   bool get supportsSportsDiscovery;

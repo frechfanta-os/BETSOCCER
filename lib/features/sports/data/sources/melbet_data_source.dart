@@ -11,6 +11,20 @@ import '../../../../core/errors/app_exception.dart';
 /// - Les conditions générales d'utilisation interdisent formellement les robots et le scraping.
 /// - Tout appel aux endpoints internes non documentés est proscrit.
 class MelbetDataSource implements SportsDataSource {
+  final bool enabled;
+  final ConnectorAccessStatus configuredAccessStatus;
+  final String? customReason;
+  final DateTime? lastChecked;
+  final String? lastErrorMessage;
+
+  MelbetDataSource({
+    this.enabled = false,
+    this.configuredAccessStatus = ConnectorAccessStatus.disabledByPolicy,
+    this.customReason,
+    this.lastChecked,
+    this.lastErrorMessage,
+  });
+
   static const String policyReason =
       'DISABLED_BY_POLICY : Le scraping et l\'accès aux flux internes MelBet sont interdits par les CGU du site et la politique de sécurité du projet BETSOCCER.';
 
@@ -21,7 +35,20 @@ class MelbetDataSource implements SportsDataSource {
   String get displayName => 'MelBet (Désactivé par politique)';
 
   @override
-  bool get isEnabled => false; // Toujours false
+  bool get isEnabled => enabled;
+
+  @override
+  ConnectorAccessStatus get accessStatus => configuredAccessStatus;
+
+  @override
+  DateTime? get lastCheckedAt => lastChecked;
+
+  @override
+  String? get lastError =>
+      lastErrorMessage ?? (enabled ? null : (customReason ?? policyReason));
+
+  @override
+  List<String> get supportedDataTypes => const [];
 
   @override
   bool get supportsSportsDiscovery => false;
@@ -42,9 +69,9 @@ class MelbetDataSource implements SportsDataSource {
   bool get supportsMatchDetails => false;
 
   Never _throwDisabled() {
-    throw const ConnectorDisabledException(
+    throw ConnectorDisabledException(
       providerId: 'melbet_restricted',
-      reason: policyReason,
+      reason: customReason ?? policyReason,
     );
   }
 

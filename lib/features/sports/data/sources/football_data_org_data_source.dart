@@ -36,6 +36,27 @@ class FootballDataOrgDataSource implements SportsDataSource {
   bool get isEnabled => apiKey != null && apiKey!.isNotEmpty;
 
   @override
+  ConnectorAccessStatus get accessStatus => isEnabled
+      ? ConnectorAccessStatus.available
+      : ConnectorAccessStatus.authenticationRequired;
+
+  @override
+  DateTime? get lastCheckedAt => null;
+
+  @override
+  String? get lastError => isEnabled
+      ? null
+      : 'API key missing (football-data.org requires an API token)';
+
+  @override
+  List<String> get supportedDataTypes => const [
+    'competitions',
+    'upcoming_matches',
+    'historical_matches',
+    'match_details',
+  ];
+
+  @override
   bool get supportsSportsDiscovery => false; // Strictement dédié au Football
 
   @override

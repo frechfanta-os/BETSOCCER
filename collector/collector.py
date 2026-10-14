@@ -18,6 +18,8 @@ from .sources.openligadb_source import OpenLigaDbSource
 from .sources.footballdata_fixtures_source import FootballDataFixturesSource
 from .sources.footballdata_historical_source import FootballDataHistoricalSource
 from .sources.thesportsdb_source import TheSportsDbSource
+from .sources.html_scraper import HtmlScraperSource
+from .sources.melbet_source import MelbetSource
 
 logger = logging.getLogger("betsoccer.collector")
 
@@ -58,6 +60,19 @@ class AutonomousCollector:
                 base_url=self.config.thesportsdb_base_url,
                 max_retries=self.config.max_retries,
                 rate_limit_delay=self.config.rate_limit_delay_seconds,
+            )
+
+        if "html_scraper" in self.config.enabled_sources:
+            self.sources["html_scraper"] = HtmlScraperSource(
+                urls=self.config.html_scraper_urls,
+                max_retries=self.config.max_retries,
+                rate_limit_delay=self.config.rate_limit_delay_seconds,
+            )
+
+        if "melbet" in self.config.enabled_sources or "melbet_restricted" in self.config.enabled_sources:
+            self.sources["melbet_restricted"] = MelbetSource(
+                is_enabled=self.config.melbet_enabled,
+                custom_reason=self.config.melbet_policy_reason,
             )
 
     async def run_sync_cycle(self, dry_run: bool = False) -> Dict[str, Any]:

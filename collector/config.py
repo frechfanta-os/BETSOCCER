@@ -67,8 +67,16 @@ class CollectorConfig:
     # TheSportsDB URLs (Free V1 API key 3)
     thesportsdb_base_url: str = "https://www.thesportsdb.com/api/v1/json/3"
 
-    # MelBet policy lock
+    # MelBet policy & robots.txt governance
     melbet_enabled: bool = False  # Strictly DISABLED_BY_POLICY
+    melbet_access_status: str = "RESTRICTED_BY_ROBOTS_TXT"
+    melbet_policy_reason: str = (
+        "DISABLED_BY_POLICY & RESTRICTED_BY_ROBOTS_TXT: "
+        "MelBet robots.txt disallows automated scraping, anti-bot firewall detected, betting odds violate zero-odds policy"
+    )
+
+    # HTML Scraper Sources
+    html_scraper_urls: List[str] = field(default_factory=list)
 
 
 DEFAULT_CONFIG = CollectorConfig()

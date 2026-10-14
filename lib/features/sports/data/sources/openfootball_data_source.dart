@@ -32,6 +32,23 @@ class OpenFootballDataSource implements SportsDataSource {
   bool get isEnabled => true;
 
   @override
+  ConnectorAccessStatus get accessStatus => ConnectorAccessStatus.available;
+
+  @override
+  DateTime? get lastCheckedAt => null;
+
+  @override
+  String? get lastError => null;
+
+  @override
+  List<String> get supportedDataTypes => const [
+    'sports',
+    'competitions',
+    'matches',
+    'historical_matches',
+  ];
+
+  @override
   bool get supportsSportsDiscovery => true;
 
   @override

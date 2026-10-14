@@ -4,6 +4,7 @@ import 'package:betsoccer/features/sports/data/sources/melbet_data_source.dart';
 import 'package:betsoccer/features/sports/data/sources/openfootball_data_source.dart';
 import 'package:betsoccer/features/sports/data/sources/thesportsdb_data_source.dart';
 import 'package:betsoccer/features/sports/data/sources/football_data_org_data_source.dart';
+import 'package:betsoccer/features/sports/domain/interfaces/sports_data_source.dart';
 
 void main() {
   group('Data Connectors Architecture & Policy Compliance Tests', () {
@@ -12,6 +13,9 @@ void main() {
 
       test('is strictly disabled by policy', () {
         expect(melbet.isEnabled, isFalse);
+        expect(melbet.accessStatus, equals(ConnectorAccessStatus.disabledByPolicy));
+        expect(melbet.lastError, contains('DISABLED_BY_POLICY'));
+        expect(melbet.supportedDataTypes, isEmpty);
         expect(melbet.supportsSportsDiscovery, isFalse);
         expect(melbet.supportsCompetitions, isFalse);
         expect(melbet.supportsUpcomingMatches, isFalse);
@@ -19,6 +23,30 @@ void main() {
         expect(melbet.supportsHistoricalMatches, isFalse);
         expect(melbet.supportsMatchDetails, isFalse);
         expect(melbet.providerId, equals('melbet_restricted'));
+      });
+
+      test('supports configurable status and custom reason', () {
+        final customMelbet = MelbetDataSource(
+          configuredAccessStatus: ConnectorAccessStatus.restrictedByRobotsTxt,
+          customReason: 'RESTRICTED_BY_ROBOTS_TXT: Disallow /statistic/*',
+          lastErrorMessage: 'HTTP 403 Forbidden',
+        );
+        expect(customMelbet.isEnabled, isFalse);
+        expect(
+          customMelbet.accessStatus,
+          equals(ConnectorAccessStatus.restrictedByRobotsTxt),
+        );
+        expect(customMelbet.lastError, equals('HTTP 403 Forbidden'));
+        expect(
+          () => customMelbet.fetchSports(),
+          throwsA(
+            isA<ConnectorDisabledException>().having(
+              (e) => e.reason,
+              'reason',
+              contains('RESTRICTED_BY_ROBOTS_TXT'),
+            ),
+          ),
+        );
       });
 
       test(
