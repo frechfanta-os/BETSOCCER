@@ -57,3 +57,19 @@
   Validated against keystore `android/app/betsoccer.keystore` during CI pipeline.
 - **Pipeline Execution**:
   GitHub Actions run [#38627781718](https://github.com/frechfanta-os/BETSOCCER/actions/runs/38627781718) completed with status `success`. Release published live at [GitHub Releases v1.0.0](https://github.com/frechfanta-os/BETSOCCER/releases/tag/v1.0.0).
+
+## 6. Release v1.0.1 (Build 2) — Multi-Sport & 2026 Fixtures Update
+- **Target Tag**: `v1.0.1`
+- **Release URL**: [BETSOCCER v1.0.1 Release](https://github.com/frechfanta-os/BETSOCCER/releases/tag/v1.0.1)
+- **CI/CD Run**: [Workflow Run #38682372412](https://github.com/frechfanta-os/BETSOCCER/actions/runs/38682372412) (Completed with status `success`)
+- **Key Enhancements**:
+  - Full multi-sport integration (Football, Basketball NBA/EuroLeague, Tennis ATP/WTA, Handball HBL, Volleyball VBL).
+  - Preloaded comprehensive SQLite database (6 MB) embedded directly in `assets/data/betsoccer.db`.
+  - Fixed Home screen `todayMatches` to strictly prioritize LIVE matches and upcoming 2026 fixtures.
+  - Foreign key safety in `SportsDao.upsertMatch` to ensure seamless data persistence across all connectors.
+- **Artifacts**:
+  - `BETSOCCER-v1.0.1.apk` (54,409,630 bytes)
+  - `app-release.apk` (54,409,630 bytes)
+  - `app-release.apk.sha256`
+- **Verified SHA-256**:
+  `8adb85868a0a3a4b8703c38d239e265e5c513c0edc9550b8659892e8b1fe730d`
