@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
@@ -38,6 +41,25 @@ class AppDatabase {
     } else {
       final databasesDir = await factory.getDatabasesPath();
       dbPath = p.join(databasesDir, databaseName);
+
+      // Préchargement de la base multi-sport empaquetée si absente ou non mise à jour
+      try {
+        final dbFile = File(dbPath);
+        final fileExists = await dbFile.exists();
+        final fileSize = fileExists ? await dbFile.length() : 0;
+
+        if (!fileExists || fileSize < 500000) {
+          await Directory(databasesDir).create(recursive: true);
+          final byteData = await rootBundle.load('assets/data/betsoccer.db');
+          final bytes = byteData.buffer.asUint8List(
+            byteData.offsetInBytes,
+            byteData.lengthInBytes,
+          );
+          await dbFile.writeAsBytes(bytes, flush: true);
+        }
+      } catch (_) {
+        // Fallback transparent vers openDatabase avec onCreate en environnement de test
+      }
     }
 
     _db = await factory.openDatabase(

@@ -143,10 +143,12 @@ class SportsController extends ChangeNotifier {
     if (upcoming.isNotEmpty) {
       return upcoming.first;
     }
-    if (_allMatches.isNotEmpty) {
-      final withResult = _allMatches.where((m) => m.result != null).toList();
-      if (withResult.isNotEmpty) return withResult.first;
-      return _allMatches.first;
+    // Si aucun match n'est en direct ni à venir, afficher le match le plus récent (2026 en priorité)
+    final sportMatches = _filterMatchesBySport(_allMatches);
+    if (sportMatches.isNotEmpty) {
+      final sortedRecent = List<MatchEntity>.from(sportMatches)
+        ..sort((a, b) => b.utcKickoff.compareTo(a.utcKickoff));
+      return sortedRecent.first;
     }
     return null;
   }
@@ -178,10 +180,23 @@ class SportsController extends ChangeNotifier {
     }).toList();
   }
 
-  /// Matchs du jour (Home)
+  /// Matchs du jour (Home) : Priorité aux rencontres en direct et à venir
   List<MatchEntity> get todayMatches {
-    final matches = _allMatches.isNotEmpty ? _allMatches : _upcomingMatches;
-    return _filterMatchesBySport(matches);
+    final live = filteredLiveMatches;
+    final upcoming = filteredUpcomingMatches;
+
+    final currentAndUpcoming = <MatchEntity>[...live, ...upcoming];
+
+    if (currentAndUpcoming.isNotEmpty) {
+      return currentAndUpcoming;
+    }
+
+    // Si aucune rencontre n'est en direct ni à venir, afficher les résultats les plus récents (triés par date décroissante)
+    final sportMatches = _filterMatchesBySport(_allMatches);
+    final sortedRecent = List<MatchEntity>.from(sportMatches)
+      ..sort((a, b) => b.utcKickoff.compareTo(a.utcKickoff));
+
+    return sortedRecent.take(20).toList();
   }
 
   /// Matchs en direct filtrés (Live Center : UNIQUEMENT les rencontres en direct actif)
@@ -204,6 +219,9 @@ class SportsController extends ChangeNotifier {
       ..._upcomingMatches.where((m) => m.status == MatchStatus.upcoming),
       ..._allMatches.where((m) => m.status == MatchStatus.upcoming),
     }.toList();
+
+    // Trier les rencontres à venir chronologiquement (la plus proche d'abord)
+    combined.sort((a, b) => a.utcKickoff.compareTo(b.utcKickoff));
 
     var list = _filterMatchesBySport(combined);
 

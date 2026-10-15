@@ -11,6 +11,7 @@ import 'features/sports/data/sources/openligadb_data_source.dart';
 import 'features/sports/data/sources/thesportsdb_data_source.dart';
 import 'features/sports/data/sources/football_data_org_data_source.dart';
 import 'features/sports/data/sources/melbet_data_source.dart';
+import 'features/sports/domain/entities/sport.dart';
 import 'features/sports/domain/repositories/sports_repository.dart';
 import 'features/sports/presentation/controllers/sports_controller.dart';
 import 'features/sports/presentation/widgets/app_scaffold.dart';
@@ -61,6 +62,55 @@ void main() async {
     } catch (_) {
       // Ignorer si l'asset n'est pas encore accessible au premier build
     }
+  }
+
+  // Assurer la présence des 5 sports officiels (Football, Basketball, Tennis, Handball, Volleyball)
+  final sportsList = await sportsDao.getAllSports();
+  final sportIds = sportsList.map((s) => s.id).toSet();
+  final missingSports = [
+    if (!sportIds.contains('sport_football'))
+      const SportEntity(
+        id: 'sport_football',
+        name: 'Football',
+        code: 'SOCCER',
+        iconRef: 'sports_soccer',
+        sourceProvider: 'system',
+      ),
+    if (!sportIds.contains('sport_basketball'))
+      const SportEntity(
+        id: 'sport_basketball',
+        name: 'Basketball',
+        code: 'BASKETBALL',
+        iconRef: 'sports_basketball',
+        sourceProvider: 'thesportsdb',
+      ),
+    if (!sportIds.contains('sport_tennis'))
+      const SportEntity(
+        id: 'sport_tennis',
+        name: 'Tennis',
+        code: 'TENNIS',
+        iconRef: 'sports_tennis',
+        sourceProvider: 'thesportsdb',
+      ),
+    if (!sportIds.contains('sport_handball'))
+      const SportEntity(
+        id: 'sport_handball',
+        name: 'Handball',
+        code: 'HANDBALL',
+        iconRef: 'sports_handball',
+        sourceProvider: 'openligadb',
+      ),
+    if (!sportIds.contains('sport_volleyball'))
+      const SportEntity(
+        id: 'sport_volleyball',
+        name: 'Volleyball',
+        code: 'VOLLEYBALL',
+        iconRef: 'sports_volleyball',
+        sourceProvider: 'openligadb',
+      ),
+  ];
+  if (missingSports.isNotEmpty) {
+    await sportsDao.upsertSports(missingSports);
   }
 
   // 5. Contrôleur d'état principal

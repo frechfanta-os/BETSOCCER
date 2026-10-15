@@ -169,6 +169,40 @@ class SportsDao {
   Future<void> upsertMatch(MatchEntity match) async {
     final nowIso = DateTime.now().toUtc().toIso8601String();
     await _db.transaction((txn) async {
+      // Assurer la présence des clés étrangères requises
+      await txn.insert('sports', {
+        'id': match.sportId,
+        'name': match.sportId.replaceFirst('sport_', '').toUpperCase(),
+        'code': match.sportId.replaceFirst('sport_', '').toUpperCase(),
+        'source_provider': match.sourceProvider,
+        'created_at': nowIso,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+
+      await txn.insert('competitions', {
+        'id': match.competitionId,
+        'sport_id': match.sportId,
+        'name': match.competitionName ?? 'Compétition',
+        'tier': 1,
+        'source_provider': match.sourceProvider,
+        'created_at': nowIso,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+
+      await txn.insert('teams', {
+        'id': match.homeTeamId,
+        'sport_id': match.sportId,
+        'name': match.homeTeamName,
+        'source_provider': match.sourceProvider,
+        'created_at': nowIso,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+
+      await txn.insert('teams', {
+        'id': match.awayTeamId,
+        'sport_id': match.sportId,
+        'name': match.awayTeamName,
+        'source_provider': match.sourceProvider,
+        'created_at': nowIso,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+
       await txn.insert('matches', {
         ...match.toMap(),
         'created_at': nowIso,

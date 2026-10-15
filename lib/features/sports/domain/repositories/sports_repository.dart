@@ -74,7 +74,7 @@ class SportsRepository {
     final cached = await sportsDao.getMatches(
       competitionId: competitionId,
       status: MatchStatus.upcoming.name,
-      from: DateTime.now().toUtc(),
+      from: DateTime.now().toUtc().subtract(const Duration(hours: 12)),
     );
     if (cached.isNotEmpty && !forceRefresh) {
       return cached;
